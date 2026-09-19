@@ -1,1227 +1,224 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<!doctype html>
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="pandoc 3.10" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Chrome MCP Bridge 完整搭建教程</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Chrome MCP Bridge 2.3.0：Linux 搭建、原生多图、受限私网接入、安全边界与故障排查。">
+  <title>Chrome MCP Bridge 2.3.0 · 完整搭建教程</title>
   <style>
-    /* Default styles provided by pandoc.
-    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
-    */
-    span.smallcaps{font-variant: small-caps;}
-    div.columns{display: flex; gap: 1.5em;}
-    div.column{flex: auto;}
-    @media screen {
-    div.columns{gap: min(4vw, 1.5em);}
-    div.column{overflow-x: auto;}
-    }
-    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-    /* The extra [class] is a hack that increases specificity enough to
-       override a similar rule in reveal.js */
-    ul.task-list[class]{list-style: none;}
-    ul.task-list li input[type="checkbox"] {
-      font-size: inherit;
-      width: 0.8em;
-      margin: 0 0.8em 0.2em -1.6em;
-      vertical-align: middle;
-    }
-    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
-    /* CSS for syntax highlighting */
-    html { -webkit-text-size-adjust: 100%; }
-    pre > code.sourceCode { white-space: pre; position: relative; }
-    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
-    pre > code.sourceCode > span:empty { height: 1.2em; }
-    .sourceCode { overflow: visible; }
-    code.sourceCode > span { color: inherit; text-decoration: inherit; }
-    div.sourceCode { margin: 1em 0; }
-    pre.sourceCode { margin: 0; }
-    @media screen {
-    div.sourceCode { overflow: auto; }
-    }
-    @media print {
-    pre > code.sourceCode { white-space: pre-wrap; }
-    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
-    }
-    pre.numberSource code
-      { counter-reset: source-line 0; }
-    pre.numberSource code > span
-      { position: relative; left: -4em; counter-increment: source-line; }
-    pre.numberSource code > span > a:first-child::before
-      { content: counter(source-line);
-        position: relative; left: -1em; text-align: right; vertical-align: baseline;
-        border: none; display: inline-block;
-        -webkit-touch-callout: none; -webkit-user-select: none;
-        -khtml-user-select: none; -moz-user-select: none;
-        -ms-user-select: none; user-select: none;
-        padding: 0 4px; width: 4em;
-        color: #aaaaaa;
-      }
-    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
-    div.sourceCode
-      {   }
-    @media screen {
-    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-    }
-    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
-    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
-    code span.at { color: #7d9029; } /* Attribute */
-    code span.bn { color: #40a070; } /* BaseN */
-    code span.bu { color: #008000; } /* BuiltIn */
-    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
-    code span.ch { color: #4070a0; } /* Char */
-    code span.cn { color: #880000; } /* Constant */
-    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
-    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
-    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
-    code span.dt { color: #902000; } /* DataType */
-    code span.dv { color: #40a070; } /* DecVal */
-    code span.er { color: #ff0000; font-weight: bold; } /* Error */
-    code span.ex { } /* Extension */
-    code span.fl { color: #40a070; } /* Float */
-    code span.fu { color: #06287e; } /* Function */
-    code span.im { color: #008000; font-weight: bold; } /* Import */
-    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
-    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
-    code span.op { color: #666666; } /* Operator */
-    code span.ot { color: #007020; } /* Other */
-    code span.pp { color: #bc7a00; } /* Preprocessor */
-    code span.sc { color: #4070a0; } /* SpecialChar */
-    code span.ss { color: #bb6688; } /* SpecialString */
-    code span.st { color: #4070a0; } /* String */
-    code span.va { color: #19177c; } /* Variable */
-    code span.vs { color: #4070a0; } /* VerbatimString */
-    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+    :root{color-scheme:light;--ink:#253345;--muted:#536477;--accent:#166b70;--line:#d7e2e8;--paper:#fff;--bg:#f3f7f8}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+    main{max-width:1000px;margin:36px auto;padding:40px;background:var(--paper);border:1px solid var(--line);border-radius:20px}
+    h1,h2,h3{line-height:1.4}h1{font-size:2.1rem;margin:.35em 0}h2{border-top:1px solid var(--line);padding-top:1.2em;margin-top:2em;color:var(--accent)}
+    h3{margin-top:1.5em}a{color:var(--accent);text-underline-offset:3px}p,li{overflow-wrap:anywhere}.eyebrow{letter-spacing:.12em;font-size:.8rem;color:var(--accent);font-weight:700}.sub{color:var(--muted)}
+    pre{overflow:auto;background:#172835;color:#e7f2f6;border-radius:12px;padding:20px;line-height:1.55;font-size:14px}code{font-family:ui-monospace,Consolas,monospace}p code,li code,td code{background:#edf3f5;padding:1px 5px;border-radius:4px}
+    .notice{padding:18px 20px;background:#fff4df;border-left:4px solid #c18a24;border-radius:8px}.good{background:#eaf5f1;border-left-color:#35866c}table{border-collapse:collapse;width:100%;font-size:.94rem}th,td{padding:12px;text-align:left;vertical-align:top;border:1px solid var(--line)}th{background:#edf4f6}.table-wrap{overflow-x:auto}nav ol{columns:2;column-gap:30px}footer{margin-top:36px;color:var(--muted);font-size:.9rem}
+    @media(max-width:640px){main{margin:0;padding:22px 16px;border:0;border-radius:0}h1{font-size:1.65rem}nav ol{columns:1}pre{padding:14px;font-size:13px}}
+    @media print{body,main{background:#fff}main{margin:0;padding:0;border:0}pre{white-space:pre-wrap;background:#f2f5f7;color:#172835}nav{display:none}h2,h3{break-after:avoid}}
   </style>
-  <link rel="stylesheet" href="nul" />
 </head>
-<body>
-<header id="title-block-header">
-<h1 class="title">Chrome MCP Bridge 完整搭建教程</h1>
+<body><main>
+<header>
+  <div class="eyebrow">CHROME MCP BRIDGE · 2.3.0</div>
+  <h1>让 AI 读网页，也真正看见图片</h1>
+  <p class="sub">完整搭建教程 · 2026-09-20 · Linux 桌面 / Chrome 或 Chromium / HTTP MCP</p>
+  <p>本版把旧的两工具教程升级成三个工具的可运行项目。小红书笔记默认在打开时附带图片清单、标题正文和当前可见评论；再调用一次批量看图，可返回多张独立原生图片。</p>
+  <p class="notice"><strong>先看安全边界：</strong>这个个人工具没有应用层身份认证，公开包默认仅监听电脑回环地址。CDP 只能留在本机；MCP 不可直接开放公网。本教程不会配置绕过登录、验证码或平台访问控制。</p>
 </header>
-<h1 id="chrome-mcp-bridge-完整搭建教程">Chrome MCP Bridge
-完整搭建教程</h1>
-<blockquote>
-<p>在 Ubuntu 上部署基于 Chrome DevTools Protocol 的 MCP Bridge，让 AI
-助手能操控真实浏览器：导航网页、提取正文、读取需要登录的页面内容。</p>
-</blockquote>
-<hr />
-<h2 id="目录">目录</h2>
-<ol type="1">
-<li><a href="#1-概述">概述</a></li>
-<li><a href="#2-架构说明">架构说明</a></li>
-<li><a href="#3-环境准备">环境准备</a></li>
-<li><a href="#4-step-1以调试模式启动-chromium">Step 1：以调试模式启动
-Chromium</a></li>
-<li><a href="#5-step-2编写-mcp-bridge">Step 2：编写 MCP Bridge</a></li>
-<li><a href="#6-step-3测试-bridge">Step 3：测试 Bridge</a></li>
-<li><a href="#7-step-4注册为系统服务">Step 4：注册为系统服务</a></li>
-<li><a href="#8-step-5配置-mcp-客户端">Step 5：配置 MCP 客户端</a></li>
-<li><a href="#9-step-6tailscale-远程访问可选">Step 6：Tailscale
-远程访问（可选）</a>(#8-step-5配置-mcp-客户端)</li>
-<li><a href="#9-可用工具">可用工具</a></li>
-<li><a href="#10-故障排查">故障排查</a></li>
-<li><a href="#11-安全注意事项">安全注意事项</a></li>
-<li><a href="#12-附录完整-bridge-源码">附录：完整 Bridge 源码</a></li>
-</ol>
-<hr />
-<h2 id="概述">1. 概述</h2>
-<h3 id="什么是-chrome-mcp-bridge">1.1 什么是 Chrome MCP Bridge？</h3>
-<p>它是一个 <strong>MCP (Model Context Protocol) 服务器</strong>，把真实
-Chrome/Chromium 浏览器的能力暴露给 AI 助手。与 Playwright
-等方案不同：</p>
-<table>
-<colgroup>
-<col style="width: 18%" />
-<col style="width: 30%" />
-<col style="width: 52%" />
-</colgroup>
-<thead>
-<tr>
-<th>对比维度</th>
-<th>Playwright MCP</th>
-<th>Chrome MCP Bridge (本方案)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>浏览器</td>
-<td>启动独立无头浏览器</td>
-<td>使用你<strong>日常的</strong> Chromium</td>
-</tr>
-<tr>
-<td>登录态</td>
-<td>❌ 需重新登录</td>
-<td>✅ 保留所有已登录网站</td>
-</tr>
-<tr>
-<td>资源占用</td>
-<td>额外浏览器进程</td>
-<td>复用已有浏览器</td>
-</tr>
-<tr>
-<td>安装依赖</td>
-<td>Playwright + 浏览器二进制</td>
-<td>仅需 Python + websocket-client</td>
-</tr>
-<tr>
-<td>启动速度</td>
-<td>慢（需启动浏览器）</td>
-<td>快（Bridge 常驻）</td>
-</tr>
-</tbody>
-</table>
-<h3 id="核心能力">1.2 核心能力</h3>
-<ul>
-<li>✅ <strong>浏览任意网页</strong>：导航到指定
-URL（包括需要登录的网站）</li>
-<li>✅
-<strong>提取完整正文</strong>：获取页面标题、描述、正文文本，自动去除导航栏/广告/页脚</li>
-<li>✅
-<strong>保留登录态</strong>：小红书、知乎、B站等已登录网站直接可用</li>
-<li>✅ <strong>短链追踪</strong>：自动跟随 <code>xhslink.com</code>
-等短链接重定向</li>
-</ul>
-<h3 id="适用场景">1.3 适用场景</h3>
-<ul>
-<li>让 AI 帮你阅读小红书笔记、知乎文章等需要登录的内容</li>
-<li>让 AI 实时查询网页信息（新闻、文档、价格等）</li>
-<li>结合其他 MCP 工具，实现「浏览 → 提取 → 分析 →
-操作」的自动化流水线</li>
-</ul>
-<hr />
-<h2 id="架构说明">2. 架构说明</h2>
-<pre><code>┌──────────────┐     HTTP (MCP JSON-RPC)     ┌──────────────┐     WebSocket (CDP)     ┌──────────────┐
-│              │ ──────────────────────────▶ │              │ ─────────────────────▶ │              │
-│  MCP 客户端   │    :9224                    │  MCP Bridge  │    :9223               │  Chromium    │
-│  (RikkaHub等) │ ◀────────────────────────── │  (Python)    │ ◀───────────────────── │  (你的浏览器)  │
-│              │                             │              │                         │              │
-└──────────────┘                             └──────────────┘                         └──────────────┘</code></pre>
-<ul>
-<li><strong>9223 端口</strong>：Chromium DevTools
-Protocol（CDP）调试端口，Bridge 通过 WebSocket 连接</li>
-<li><strong>9224 端口</strong>：MCP Bridge HTTP 端口，AI
-客户端连接此处</li>
-<li><strong>Bridge</strong>：Python 脚本，负责翻译 MCP 协议 ↔︎ CDP
-协议</li>
-</ul>
-<p>Bridge 监听 0.0.0.0:9224，局域网可直接访问。远程访问需搭配 Tailscale
-组网（自带端到端加密）。</p>
-<hr />
-<h2 id="环境准备">3. 环境准备</h2>
-<h3 id="硬件系统">3.1 硬件/系统</h3>
-<table>
-<thead>
-<tr>
-<th>要求</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>操作系统</td>
-<td>Ubuntu 24.04（其他 Linux 发行版同理）</td>
-</tr>
-<tr>
-<td>浏览器</td>
-<td>Chromium 或 Google Chrome</td>
-</tr>
-<tr>
-<td>运行方式</td>
-<td>需要图形桌面环境（Chromium 需要 X11/Wayland）</td>
-</tr>
-<tr>
-<td>网络</td>
-<td>常开，与 MCP 客户端在同一局域网或通过 Tailscale 连接</td>
-</tr>
-</tbody>
-</table>
-<h3 id="软件依赖">3.2 软件依赖</h3>
-<div class="sourceCode" id="cb2"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Python 3（系统自带）</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">--version</span>  <span class="co"># 应 ≥ 3.8</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 安装 websocket-client</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">pip3</span> install <span class="at">--break-system-packages</span> websocket-client</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 确认安装</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> <span class="at">-c</span> <span class="st">&quot;import websocket; print(&#39;OK&#39;)&quot;</span></span></code></pre></div>
-<hr />
-<h2 id="step-1以调试模式启动-chromium">4. Step 1：以调试模式启动
-Chromium</h2>
-<p>Chromium 必须以调试模式启动，开启 CDP 端口。</p>
-<h3 id="关闭现有-chromium">4.1 关闭现有 Chromium</h3>
-<div class="sourceCode" id="cb3"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 先关闭所有正在运行的 Chromium</span></span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">killall</span> chromium-browser chrome <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 或</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">pkill</span> <span class="at">-f</span> chromium</span></code></pre></div>
-<h3 id="启动命令">4.2 启动命令</h3>
-<div class="sourceCode" id="cb4"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/bin/bash</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 找到 X 认证文件</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">DISPLAY</span><span class="op">=</span>:0</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">XAUTHORITY</span><span class="op">=</span><span class="va">$(</span><span class="fu">ls</span> /run/user/1000/.mutter-Xwaylandauth.<span class="pp">*</span> <span class="dv">2</span><span class="op">&gt;</span>/dev/null <span class="kw">|</span> <span class="fu">head</span> <span class="at">-1</span><span class="va">)</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 启动 Chromium</span></span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="ex">/usr/bin/chromium-browser</span> <span class="dt">\</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">--remote-debugging-port</span><span class="op">=</span>9223 <span class="dt">\</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">--remote-allow-origins</span><span class="op">=</span><span class="pp">*</span> <span class="dt">\</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--no-first-run</span> <span class="dt">\</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--no-default-browser-check</span> <span class="dt">\</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">--disable-component-update</span> <span class="dt">\</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">--restore-last-session</span> <span class="dt">\</span></span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  https://www.baidu.com <span class="kw">&amp;</span></span></code></pre></div>
-<p><strong>关键参数说明：</strong></p>
-<table>
-<colgroup>
-<col style="width: 50%" />
-<col style="width: 50%" />
-</colgroup>
-<thead>
-<tr>
-<th>参数</th>
-<th>作用</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>--remote-debugging-port=9223</code></td>
-<td>开启 CDP 调试端口</td>
-</tr>
-<tr>
-<td><code>--remote-allow-origins=*</code></td>
-<td><strong>必须！</strong> 允许 WebSocket 连接，否则会返回 403</td>
-</tr>
-<tr>
-<td><code>--no-first-run</code></td>
-<td>跳过首次运行向导</td>
-</tr>
-<tr>
-<td><code>--restore-last-session</code></td>
-<td>恢复上次的标签页（保留登录态）</td>
-</tr>
-</tbody>
-</table>
-<h3 id="验证">4.3 验证</h3>
-<div class="sourceCode" id="cb5"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 确认 9223 端口在监听</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">ss</span> <span class="at">-tlnp</span> <span class="kw">|</span> <span class="fu">grep</span> 9223</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 获取当前打开的标签页列表</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-s</span> http://127.0.0.1:9223/json <span class="kw">|</span> <span class="ex">python3</span> <span class="at">-m</span> json.tool</span></code></pre></div>
-<p>输出示例：</p>
-<div class="sourceCode" id="cb6"><pre
-class="sourceCode json"><code class="sourceCode json"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ot">[</span><span class="fu">{</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;DFA2E73EF18A22D4A970078D8BB3C9EF&quot;</span><span class="fu">,</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;title&quot;</span><span class="fu">:</span> <span class="st">&quot;百度一下，你就知道&quot;</span><span class="fu">,</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;page&quot;</span><span class="fu">,</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;url&quot;</span><span class="fu">:</span> <span class="st">&quot;https://www.baidu.com/&quot;</span><span class="fu">,</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;webSocketDebuggerUrl&quot;</span><span class="fu">:</span> <span class="st">&quot;ws://127.0.0.1:9223/devtools/page/DFA2E73...&quot;</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span><span class="ot">]</span></span></code></pre></div>
-<h3 id="设置开机自启可选">4.4 设置开机自启（可选）</h3>
-<p>在 GNOME 桌面环境添加启动项： 1. 打开「Startup Applications」 2.
-添加新条目，命令填写上面的启动脚本路径 3. 或使用
-crontab：<code>@reboot /home/你的用户名/start_chromium.sh</code></p>
-<hr />
-<h2 id="step-2编写-mcp-bridge">5. Step 2：编写 MCP Bridge</h2>
-<h3 id="创建-bridge-脚本">5.1 创建 Bridge 脚本</h3>
-<p>将完整脚本保存到 <code>/opt/chrome_mcp_bridge.py</code>（完整源码见
-<a href="#12-附录完整-bridge-源码">附录</a>）。</p>
-<div class="sourceCode" id="cb7"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cp chrome_mcp_bridge.py /opt/chrome_mcp_bridge.py</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> chmod +x /opt/chrome_mcp_bridge.py</span></code></pre></div>
-<h3 id="核心逻辑说明">5.2 核心逻辑说明</h3>
-<p>Bridge 的核心是 <strong>CDPClient</strong> 类，它通过 WebSocket 向
-Chromium 发送 CDP 命令：</p>
-<div class="sourceCode" id="cb8"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CDPClient:</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> evaluate(<span class="va">self</span>, expression: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        <span class="co">&quot;&quot;&quot;在页面中执行 JavaScript 并返回结果&quot;&quot;&quot;</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.send(<span class="st">&quot;Runtime.evaluate&quot;</span>, {</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;expression&quot;</span>: expression,</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;returnByValue&quot;</span>: <span class="va">True</span>,</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>        })</span></code></pre></div>
-<p>提取页面内容的原理是注入 JavaScript 来获取 DOM 文本：</p>
-<div class="sourceCode" id="cb9"><pre
-class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 核心提取逻辑</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> article <span class="op">=</span> <span class="bu">document</span><span class="op">.</span><span class="fu">querySelector</span>(<span class="st">&#39;article&#39;</span>)<span class="op">;</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> main <span class="op">=</span> <span class="bu">document</span><span class="op">.</span><span class="fu">querySelector</span>(<span class="st">&#39;main&#39;</span>)<span class="op">;</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> el <span class="op">=</span> article <span class="op">||</span> main <span class="op">||</span> <span class="bu">document</span><span class="op">.</span><span class="at">body</span><span class="op">;</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="kw">var</span> clone <span class="op">=</span> el<span class="op">.</span><span class="fu">cloneNode</span>(<span class="kw">true</span>)<span class="op">;</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co">// 移除无关元素</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>clone<span class="op">.</span><span class="fu">querySelectorAll</span>(<span class="st">&#39;script, style, nav, footer, header, .ad&#39;</span>)<span class="op">.</span><span class="fu">forEach</span>(n <span class="kw">=&gt;</span> n<span class="op">.</span><span class="fu">remove</span>())<span class="op">;</span></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="cf">return</span> clone<span class="op">.</span><span class="at">innerText</span><span class="op">;</span></span></code></pre></div>
-<h3 id="注意事项">5.3 注意事项</h3>
-<ul>
-<li><strong>网页提取上限</strong>：默认截取前 50000 字符，避免 token
-爆炸</li>
-<li><strong>短链重定向</strong>：<code>chrome_navigate</code> 自动跟随
-HTTP 重定向</li>
-<li><strong>SPA 页面</strong>：小红书、知乎等单页应用需要等待 JS
-渲染（Bridge 内置 1 秒等待）</li>
-</ul>
-<hr />
-<h2 id="step-3测试-bridge">6. Step 3：测试 Bridge</h2>
-<h3 id="手动启动">6.1 手动启动</h3>
-<div class="sourceCode" id="cb10"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 前台启动（调试用，Ctrl+C 停止）</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> /opt/chrome_mcp_bridge.py</span></code></pre></div>
-<p>看到以下输出表示成功：</p>
-<pre><code>Checking CDP endpoint 127.0.0.1:9223 ...
-CDP OK – found tab: 百度一下，你就知道
-Chrome MCP Bridge listening on 0.0.0.0:9224</code></pre>
-<h3 id="后台启动">6.2 后台启动</h3>
-<div class="sourceCode" id="cb12"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">nohup</span> python3 /opt/chrome_mcp_bridge.py <span class="op">&gt;</span> /var/log/chrome_mcp_bridge.log <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">&amp;</span></span></code></pre></div>
-<h3 id="测试工具调用">6.3 测试工具调用</h3>
-<p><strong>测试 1：获取工具列表</strong></p>
-<div class="sourceCode" id="cb13"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-s</span> <span class="at">-X</span> POST http://127.0.0.1:9224/ <span class="dt">\</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">&quot;Content-Type: application/json&quot;</span> <span class="dt">\</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}&#39;</span></span></code></pre></div>
-<p><strong>测试 2：导航到网页</strong></p>
-<div class="sourceCode" id="cb14"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-s</span> <span class="at">-X</span> POST http://127.0.0.1:9224/ <span class="dt">\</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">&quot;Content-Type: application/json&quot;</span> <span class="dt">\</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/call&quot;,&quot;params&quot;:{&quot;name&quot;:&quot;chrome_navigate&quot;,&quot;arguments&quot;:{&quot;url&quot;:&quot;https://www.bilibili.com&quot;}}}&#39;</span></span></code></pre></div>
-<p><strong>测试 3：提取页面内容</strong></p>
-<div class="sourceCode" id="cb15"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-s</span> <span class="at">-X</span> POST http://127.0.0.1:9224/ <span class="dt">\</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">&quot;Content-Type: application/json&quot;</span> <span class="dt">\</span></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:3,&quot;method&quot;:&quot;tools/call&quot;,&quot;params&quot;:{&quot;name&quot;:&quot;chrome_get_web_content&quot;,&quot;arguments&quot;:{}}}&#39;</span></span></code></pre></div>
-<p>预期返回页面标题、URL 和完整正文文本。</p>
-<hr />
-<h2 id="step-4注册为系统服务">7. Step 4：注册为系统服务</h2>
-<h3 id="创建-systemd-服务文件">7.1 创建 systemd 服务文件</h3>
-<p><code>/etc/systemd/system/chrome-mcp-bridge.service</code>：</p>
-<div class="sourceCode" id="cb16"><pre
-class="sourceCode ini"><code class="sourceCode ini"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[Unit]</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="dt">Description</span><span class="ot">=</span><span class="st">Chrome MCP Bridge (CDP-based)</span></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="dt">After</span><span class="ot">=</span><span class="st">network.target</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[Service]</span></span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="dt">Type</span><span class="ot">=</span><span class="st">simple</span></span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="dt">User</span><span class="ot">=</span><span class="st">你的用户名</span></span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="dt">ExecStart</span><span class="ot">=</span><span class="st">/usr/bin/python3 /opt/chrome_mcp_bridge.py</span></span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="dt">Restart</span><span class="ot">=</span><span class="st">always</span></span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="dt">RestartSec</span><span class="ot">=</span><span class="dv">5</span></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="dt">StandardOutput</span><span class="ot">=</span><span class="st">append:/var/log/chrome_mcp_bridge.log</span></span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="dt">StandardError</span><span class="ot">=</span><span class="st">append:/var/log/chrome_mcp_bridge.log</span></span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="kw">[Install]</span></span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a><span class="dt">WantedBy</span><span class="ot">=</span><span class="st">multi-user.target</span></span></code></pre></div>
-<h3 id="启用服务">7.2 启用服务</h3>
-<div class="sourceCode" id="cb17"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> cp chrome-mcp-bridge.service /etc/systemd/system/</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl daemon-reload</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl enable chrome-mcp-bridge</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl start chrome-mcp-bridge</span></code></pre></div>
-<h3 id="管理命令">7.3 管理命令</h3>
-<div class="sourceCode" id="cb18"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 查看状态</span></span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl status chrome-mcp-bridge</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 重启</span></span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl restart chrome-mcp-bridge</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 查看日志</span></span>
-<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-f</span> /var/log/chrome_mcp_bridge.log</span>
-<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a><span class="co"># 停止</span></span>
-<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl stop chrome-mcp-bridge</span></code></pre></div>
-<hr />
-<h2 id="step-5配置-mcp-客户端">8. Step 5：配置 MCP 客户端</h2>
-<h3 id="rikkahub">8.1 RikkaHub</h3>
-<p>在 RikkaHub 的 MCP 设置中添加：</p>
-<table>
-<thead>
-<tr>
-<th>字段</th>
-<th>值</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>启用</td>
-<td>✅ 开启</td>
-</tr>
-<tr>
-<td>名称</td>
-<td><code>Chrome MCP</code></td>
-</tr>
-<tr>
-<td>传输类型</td>
-<td><code>Streamable HTTP</code></td>
-</tr>
-<tr>
-<td>服务器地址</td>
-<td><code>http://你的设备IP:9224</code></td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p><strong>局域网</strong>：如果 RikkaHub 在同一 WiFi 下，填局域网
-IP（如 <code>192.168.x.x:9224</code>）</p>
-<p><strong>远程</strong>：如果 RikkaHub 在云端，配置 Tailscale 后填
-Tailscale IP（详见 <a href="#9-step-6tailscale-远程访问可选">Step
-6</a>）</p>
-</blockquote>
-<h3 id="claude-desktop-claude-code">8.2 Claude Desktop / Claude
-Code</h3>
-<div class="sourceCode" id="cb19"><pre
-class="sourceCode json"><code class="sourceCode json"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;chrome-mcp&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;streamableHttp&quot;</span><span class="fu">,</span></span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;url&quot;</span><span class="fu">:</span> <span class="st">&quot;http://127.0.0.1:9224/&quot;</span></span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-<h3 id="其他支持-mcp-的客户端">8.3 其他支持 MCP 的客户端</h3>
-<p>任何支持 Streamable HTTP 传输的 MCP 客户端都可以使用，配置格式同上。
-URL 路径可以是 <code>/</code> 或任意路径，Bridge 对路径不敏感。</p>
-<hr />
-<hr />
-<h2 id="step-6tailscale-远程访问可选">9. Step 6：Tailscale
-远程访问（可选）</h2>
-<blockquote>
-<p>如果你只在局域网内使用 Chrome MCP，可以跳过本章。<br />
-如果你想让 AI
-在任何地方（出门用流量、在公司、出差）都能操控家里的浏览器，请继续。</p>
-</blockquote>
-<h3 id="为什么需要-tailscale">9.1 为什么需要 Tailscale？</h3>
-<p>Bridge 监听的是局域网 IP（如 <code>192.168.x.x</code>），离开 WiFi
-范围就无法访问。直接暴露到公网非常危险（无 HTTPS、无认证）。</p>
-<p><strong>Tailscale</strong> 是基于 WireGuard 的零配置 VPN： -
-设备之间组成虚拟私有网络，分配 <code>100.x.x.x</code> 地址 -
-自带端到端加密，无需暴露端口到公网 -
-在家自动走局域网直连（低延迟），出门走中继转发</p>
-<h3 id="安装-tailscale">9.2 安装 Tailscale</h3>
-<p><strong>在 Ubuntu 笔记本上：</strong></p>
-<div class="sourceCode" id="cb20"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 安装</span></span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-fsSL</span> https://tailscale.com/install.sh <span class="kw">|</span> <span class="fu">sh</span></span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 启动并认证（会输出一个 URL，在浏览器中打开确认）</span></span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> tailscale up</span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a><span class="co"># 验证</span></span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="ex">tailscale</span> ip <span class="at">-4</span></span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 输出类似：100.71.245.14</span></span></code></pre></div>
-<p><strong>在其他设备上（Windows/macOS/Android/iOS）：</strong></p>
-<p>从 <a
-href="https://tailscale.com/download">tailscale.com/download</a>
-下载客户端，用同一账号登录。</p>
-<p>所有设备加入同一个 tailnet 后，互相可以通过 <code>100.x.x.x</code>
-地址访问。</p>
-<h3 id="获取-auth-key防掉线">9.3 获取 Auth Key（防掉线）</h3>
-<p>Tailscale 的网页登录是一次性的——系统重启或 tailscaled
-服务重启后可能掉线。<strong>Auth Key</strong> 可以持久化认证。</p>
-<ol type="1">
-<li>打开 <a
-href="https://login.tailscale.com/admin/settings/keys">Tailscale Admin
-Console</a></li>
-<li>点击 <strong>Generate auth key</strong></li>
-<li>设置：
-<ul>
-<li>Description：<code>my-laptop</code>（随意填写）</li>
-<li><strong>Reusable</strong>：✅ 勾选（重要！）</li>
-<li>Ephemeral：❌ 不勾</li>
-<li>Expiration：90 天（最大）</li>
-</ul></li>
-<li>点击生成，复制 <code>tskey-auth-...</code> 开头的密钥</li>
-</ol>
-<blockquote>
-<p><strong>注意</strong>：密钥 90
-天到期后需重新生成一个。但已认证的设备不会掉线——密钥只是”准入凭证”，认证完就绑定设备密钥了。只有设备被手动从
-tailnet 移除后才需要新密钥。</p>
-</blockquote>
-<h3 id="使用-auth-key-绑定">9.4 使用 Auth Key 绑定</h3>
-<div class="sourceCode" id="cb21"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 用 Auth Key 认证（替代浏览器登录）</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> tailscale up <span class="at">--authkey</span><span class="op">=</span>tskey-auth-你的密钥 <span class="at">--accept-routes</span></span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 验证是否在线</span></span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="ex">tailscale</span> status</span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 应显示你的设备，不带 &quot;offline&quot; 标记</span></span></code></pre></div>
-<h3 id="测试远程连通性">9.5 测试远程连通性</h3>
-<p>假设： - 笔记本 Tailscale IP：<code>100.71.245.14</code> - RikkaHub
-服务器 Tailscale IP：<code>100.102.152.62</code></p>
-<div class="sourceCode" id="cb22"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 在笔记本上测试到 RikkaHub 服务器的连通性</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="ex">tailscale</span> ping 100.102.152.62</span></code></pre></div>
-<p>输出类似：</p>
-<pre><code>pong from iz2ze2epaverfj8eo1vi5hz (100.102.152.62) via DERP(nue) in 330ms</code></pre>
-<ul>
-<li><code>via DERP(xxx)</code>：通过中继转发（出门在外）</li>
-<li><code>direct connection</code>：直连（两人在同一局域网时自动切换）</li>
-</ul>
-<h3 id="配置-mcp-客户端使用-tailscale-ip">9.6 配置 MCP 客户端使用
-Tailscale IP</h3>
-<p><strong>方案一：双地址（推荐）</strong></p>
-<p>在 RikkaHub 中同时添加两个 MCP 源：</p>
-<table>
-<thead>
-<tr>
-<th>名称</th>
-<th>URL</th>
-<th>使用场景</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>Chrome-家里</code></td>
-<td><code>http://192.168.x.x:9224</code></td>
-<td>在家时直连，低延迟</td>
-</tr>
-<tr>
-<td><code>Chrome-外面</code></td>
-<td><code>http://100.71.245.14:9224</code></td>
-<td>出门时通过 Tailscale</td>
-</tr>
-</tbody>
-</table>
-<p>两个都启用，AI 自动可用。</p>
-<p><strong>方案二：单地址（省事）</strong></p>
-<p>只配置一个 Tailscale IP：</p>
-<table>
-<thead>
-<tr>
-<th>名称</th>
-<th>URL</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>Chrome MCP</code></td>
-<td><code>http://100.71.245.14:9224</code></td>
-</tr>
-</tbody>
-</table>
-<p>Tailscale
-会自动判断两台设备是否在同一局域网——在家走直连，出门走中继，无需手动切换。</p>
-<h3 id="tailscale-掉线怎么办">9.7 Tailscale 掉线怎么办？</h3>
-<p>如果笔记本 Tailscale 仍然显示 “offline”（常见于国内网络环境）：</p>
-<div class="sourceCode" id="cb24"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 方法1：重启 tailscaled</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl restart tailscaled</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sleep</span> 5</span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a><span class="ex">tailscale</span> status</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 方法2：如果方法1无效，用 Auth Key 重新认证</span></span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> tailscale up <span class="at">--authkey</span><span class="op">=</span>tskey-auth-你的密钥 <span class="at">--accept-routes</span></span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 方法3：使用浏览器链接登录</span></span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> tailscale up</span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a><span class="co"># 会输出 https://login.tailscale.com/a/xxxxxx</span></span>
-<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 在任意已登录 Tailscale 的设备上打开此链接确认</span></span></code></pre></div>
-<h3 id="工作原理图">9.8 工作原理图</h3>
-<pre><code>你出门在外（手机流量）                   家里（WiFi）
-┌──────────┐                           ┌──────────────┐
-│ RikkaHub │ ── Tailscale 加密隧道 ──▶ │ 笔记本        │
-│ (云端)    │   100.71.245.14:9224     │ Chromium     │
-│          │                           │ MCP Bridge   │
-└──────────┘                           └──────────────┘
-     │                                        │
-     └──── 所有流量通过 Tailscale 加密 ─────────┘
-          无需暴露任何端口到公网</code></pre>
-<h2 id="可用工具">10. 可用工具</h2>
-<h3 id="chrome_navigate">9.1 <code>chrome_navigate</code></h3>
-<p>打开指定 URL 的网页。</p>
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th>类型</th>
-<th>必填</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>url</code></td>
-<td>string</td>
-<td>✅</td>
-<td>要打开的网页 URL，支持短链</td>
-</tr>
-</tbody>
-</table>
-<p><strong>返回</strong>：导航结果 + 页面标题</p>
-<p><strong>示例</strong>：</p>
-<div class="sourceCode" id="cb26"><pre
-class="sourceCode json"><code class="sourceCode json"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;chrome_navigate&quot;</span><span class="fu">,</span></span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;arguments&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;url&quot;</span><span class="fu">:</span> <span class="st">&quot;https://www.xiaohongshu.com/explore/笔记ID&quot;</span></span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
-<h3 id="chrome_get_web_content">9.2
-<code>chrome_get_web_content</code></h3>
-<p>获取当前活跃标签页的完整文本内容。</p>
-<table>
-<thead>
-<tr>
-<th>参数</th>
-<th>类型</th>
-<th>必填</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>url</code></td>
-<td>string</td>
-<td>❌</td>
-<td>可选：先导航到此 URL 再提取</td>
-</tr>
-</tbody>
-</table>
-<p><strong>返回</strong>： - <code>URL</code>：当前页面 URL -
-<code>标题</code>：页面标题 - <code>描述</code>：meta description -
-<code>页面正文</code>：提取的文本内容（去除广告/导航等，最多 50000
-字符）</p>
-<p><strong>典型用法</strong>：</p>
-<pre><code>1. chrome_navigate(url=&quot;笔记链接&quot;)   // 先打开
-2. 等 2-3 秒让 JS 渲染
-3. chrome_get_web_content()          // 再提取</code></pre>
-<hr />
-<h2 id="故障排查">11. 故障排查</h2>
-<h3 id="q1bridge-启动后-9224-端口无监听">Q1：Bridge 启动后 9224
-端口无监听</h3>
-<div class="sourceCode" id="cb28"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 前台运行看日志</span></span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> /opt/chrome_mcp_bridge.py</span></code></pre></div>
-<p>常见原因： - Chromium 未以调试模式启动（检查 9223 端口） - Python
-缺少 <code>websocket-client</code> 包</p>
-<h3 id="q2chromium-调试端口连不上-403-forbidden">Q2：Chromium
-调试端口连不上 / 403 Forbidden</h3>
-<p><strong>症状</strong>：</p>
-<pre><code>Rejected an incoming WebSocket connection from the http://127.0.0.1:9223 origin.</code></pre>
-<p><strong>解决</strong>：启动 Chromium 时<strong>必须加</strong>
-<code>--remote-allow-origins=*</code></p>
-<h3
-id="q3提取的内容只有页脚没有正文小红书等-spa">Q3：提取的内容只有页脚没有正文（小红书等
-SPA）</h3>
-<p>小红书等单页应用内容由 JS 动态渲染。</p>
-<p><strong>解决</strong>：在 <code>chrome_navigate</code> 之后等待 2-3
-秒再调 <code>chrome_get_web_content</code>。Bridge 已内置 1
-秒等待，复杂页面可适当增加。</p>
-<h3 id="q4snap-版-chromium-的问题">Q4：Snap 版 Chromium 的问题</h3>
-<p>Ubuntu 24.04 默认通过 Snap 安装 Chromium。Snap
-沙箱可能限制某些功能。</p>
-<p><strong>检查是否 Snap 版本</strong>：</p>
-<div class="sourceCode" id="cb30"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">which</span> chromium-browser</span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 如果输出 /snap/chromium/... 则为 Snap 版</span></span></code></pre></div>
-<p>本方案采用 CDP 方式通信，已验证在 Snap 版 Chromium
-上正常工作。如果遇到其他问题，可安装 apt 版本：</p>
-<div class="sourceCode" id="cb31"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> snap remove chromium</span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt install chromium-browser</span></code></pre></div>
-<h3 id="q5display-x-认证错误">Q5：<code>DISPLAY</code> / X 认证错误</h3>
-<div class="sourceCode" id="cb32"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 找到 X 认证文件</span></span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> /run/user/1000/.mutter-Xwaylandauth.<span class="pp">*</span></span>
-<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 设置环境变量</span></span>
-<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">DISPLAY</span><span class="op">=</span>:0</span>
-<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">XAUTHORITY</span><span class="op">=</span>/run/user/1000/.mutter-Xwaylandauth.XXXXXX</span></code></pre></div>
-<h3 id="q6bridge-意外退出">Q6：Bridge 意外退出</h3>
-<p>Bridge 作为 systemd
-服务运行时会自动重启（<code>Restart=always</code>）。 查看退出原因：</p>
-<div class="sourceCode" id="cb33"><pre
-class="sourceCode bash"><code class="sourceCode bash"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> journalctl <span class="at">-u</span> chrome-mcp-bridge <span class="at">-n</span> 50</span></code></pre></div>
-<hr />
-<h2 id="安全注意事项">12. 安全注意事项</h2>
-<h3 id="端口暴露">11.1 端口暴露</h3>
-<ul>
-<li><strong>9223 端口</strong> 仅监听
-<code>127.0.0.1</code>，外部无法访问 ✅</li>
-<li><strong>9224 端口</strong> 监听
-<code>0.0.0.0</code>（所有接口），局域网其他设备可访问 ⚠️</li>
-</ul>
-<p>如需限制 9224 仅本地访问，修改 Bridge 源码中的
-<code>BRIDGE_HOST = "127.0.0.1"</code>。</p>
-<p>如果 MCP 客户端在远程（如云端 RikkaHub），需要通过 Tailscale 等 VPN
-组网，<strong>不要</strong>直接把 9224 暴露到公网。</p>
-<h3 id="浏览器登录态">11.2 浏览器登录态</h3>
-<p>因为使用的是你日常的 Chromium，所有已登录的网站（小红书、B站、GitHub
-等）都对 AI 可见。请确保： - 只给可信的 MCP 客户端配置此 Bridge -
-不要在共享设备上运行此设置 -
-敏感账户（银行、支付等）建议使用单独的浏览器配置文件</p>
-<h3 id="https">11.3 HTTPS</h3>
-<p>Bridge 本身不支持 HTTPS。如需加密传输，可通过 Nginx 反向代理或使用
-Tailscale（自带端到端加密）。</p>
-<h3 id="身份认证">11.4 身份认证</h3>
-<p>当前版本 Bridge 没有内置认证。如需添加 Bearer Token 认证，可在
-<code>do_POST</code> 方法中添加校验逻辑。参考实现：</p>
-<div class="sourceCode" id="cb34"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>AUTH_TOKEN <span class="op">=</span> <span class="st">&quot;your-secret-token&quot;</span></span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> do_POST(<span class="va">self</span>):</span>
-<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>    auth <span class="op">=</span> <span class="va">self</span>.headers.get(<span class="st">&quot;Authorization&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> auth <span class="op">!=</span> <span class="ss">f&quot;Bearer </span><span class="sc">{</span>AUTH_TOKEN<span class="sc">}</span><span class="ss">&quot;</span>:</span>
-<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._send_json({<span class="st">&quot;error&quot;</span>: <span class="st">&quot;Unauthorized&quot;</span>}, <span class="dv">401</span>)</span>
-<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span></span>
-<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ... 原有逻辑</span></span></code></pre></div>
-<hr />
-<h2 id="附录完整-bridge-源码">13. 附录：完整 Bridge 源码</h2>
-<blockquote>
-<p>保存为 <code>/opt/chrome_mcp_bridge.py</code></p>
-</blockquote>
-<div class="sourceCode" id="cb35"><pre
-class="sourceCode python"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/usr/bin/env python3</span></span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="co">&quot;&quot;&quot;</span></span>
-<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a><span class="co">Chrome MCP Bridge - CDP-based MCP server for Chromium browser control.</span></span>
-<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a><span class="co">Architecture:</span></span>
-<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a><span class="co">  MCP Client -&gt; HTTP :9224 (this bridge) -&gt; CDP WebSocket :9223 -&gt; Chromium</span></span>
-<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a><span class="co">Provides:</span></span>
-<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a><span class="co">  - chrome_navigate: Open a URL and return page title</span></span>
-<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a><span class="co">  - chrome_get_web_content: Extract full text content from current page</span></span>
-<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a><span class="co">&quot;&quot;&quot;</span></span>
-<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> http.server</span>
-<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> json</span>
-<span id="cb35-15"><a href="#cb35-15" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> urllib.request</span>
-<span id="cb35-16"><a href="#cb35-16" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> urllib.error</span>
-<span id="cb35-17"><a href="#cb35-17" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> threading</span>
-<span id="cb35-18"><a href="#cb35-18" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> time</span>
-<span id="cb35-19"><a href="#cb35-19" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> logging</span>
-<span id="cb35-20"><a href="#cb35-20" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sys</span>
-<span id="cb35-21"><a href="#cb35-21" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
-<span id="cb35-22"><a href="#cb35-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-23"><a href="#cb35-23" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
-<span id="cb35-24"><a href="#cb35-24" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> websocket</span>
-<span id="cb35-25"><a href="#cb35-25" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">ImportError</span>:</span>
-<span id="cb35-26"><a href="#cb35-26" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">&quot;Error: websocket-client not installed.&quot;</span>)</span>
-<span id="cb35-27"><a href="#cb35-27" aria-hidden="true" tabindex="-1"></a>    <span class="bu">print</span>(<span class="st">&quot;Run: pip3 install --break-system-packages websocket-client&quot;</span>)</span>
-<span id="cb35-28"><a href="#cb35-28" aria-hidden="true" tabindex="-1"></a>    sys.exit(<span class="dv">1</span>)</span>
-<span id="cb35-29"><a href="#cb35-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-30"><a href="#cb35-30" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-31"><a href="#cb35-31" aria-hidden="true" tabindex="-1"></a><span class="co"># Configuration</span></span>
-<span id="cb35-32"><a href="#cb35-32" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-33"><a href="#cb35-33" aria-hidden="true" tabindex="-1"></a>CDP_HOST <span class="op">=</span> <span class="st">&quot;127.0.0.1&quot;</span></span>
-<span id="cb35-34"><a href="#cb35-34" aria-hidden="true" tabindex="-1"></a>CDP_PORT <span class="op">=</span> <span class="dv">9223</span></span>
-<span id="cb35-35"><a href="#cb35-35" aria-hidden="true" tabindex="-1"></a>BRIDGE_HOST <span class="op">=</span> <span class="st">&quot;0.0.0.0&quot;</span>   <span class="co"># 改为 &quot;127.0.0.1&quot; 可限制仅本地访问</span></span>
-<span id="cb35-36"><a href="#cb35-36" aria-hidden="true" tabindex="-1"></a>BRIDGE_PORT <span class="op">=</span> <span class="dv">9224</span></span>
-<span id="cb35-37"><a href="#cb35-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-38"><a href="#cb35-38" aria-hidden="true" tabindex="-1"></a>logging.basicConfig(</span>
-<span id="cb35-39"><a href="#cb35-39" aria-hidden="true" tabindex="-1"></a>    level<span class="op">=</span>logging.INFO,</span>
-<span id="cb35-40"><a href="#cb35-40" aria-hidden="true" tabindex="-1"></a>    <span class="bu">format</span><span class="op">=</span><span class="st">&quot;</span><span class="sc">%(asctime)s</span><span class="st"> [</span><span class="sc">%(levelname)s</span><span class="st">] </span><span class="sc">%(message)s</span><span class="st">&quot;</span>,</span>
-<span id="cb35-41"><a href="#cb35-41" aria-hidden="true" tabindex="-1"></a>    handlers<span class="op">=</span>[logging.StreamHandler(sys.stderr)],</span>
-<span id="cb35-42"><a href="#cb35-42" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb35-43"><a href="#cb35-43" aria-hidden="true" tabindex="-1"></a>logger <span class="op">=</span> logging.getLogger(<span class="st">&quot;chrome-mcp-bridge&quot;</span>)</span>
-<span id="cb35-44"><a href="#cb35-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-45"><a href="#cb35-45" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-46"><a href="#cb35-46" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-47"><a href="#cb35-47" aria-hidden="true" tabindex="-1"></a><span class="co"># CDP Client</span></span>
-<span id="cb35-48"><a href="#cb35-48" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-49"><a href="#cb35-49" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> CDPClient:</span>
-<span id="cb35-50"><a href="#cb35-50" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Minimal CDP WebSocket client for Chrome DevTools Protocol.&quot;&quot;&quot;</span></span>
-<span id="cb35-51"><a href="#cb35-51" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-52"><a href="#cb35-52" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="fu">__init__</span>(<span class="va">self</span>, ws_url: <span class="bu">str</span>):</span>
-<span id="cb35-53"><a href="#cb35-53" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ws_url <span class="op">=</span> ws_url</span>
-<span id="cb35-54"><a href="#cb35-54" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ws: websocket.WebSocket <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb35-55"><a href="#cb35-55" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._msg_id <span class="op">=</span> <span class="dv">0</span></span>
-<span id="cb35-56"><a href="#cb35-56" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._lock <span class="op">=</span> threading.Lock()</span>
-<span id="cb35-57"><a href="#cb35-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-58"><a href="#cb35-58" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> <span class="ex">connect</span>(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb35-59"><a href="#cb35-59" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.ws <span class="op">=</span> websocket.create_connection(<span class="va">self</span>.ws_url, timeout<span class="op">=</span><span class="dv">10</span>)</span>
-<span id="cb35-60"><a href="#cb35-60" aria-hidden="true" tabindex="-1"></a>        logger.info(<span class="st">&quot;CDP connected to </span><span class="sc">%s</span><span class="st">&quot;</span>, <span class="va">self</span>.ws_url)</span>
-<span id="cb35-61"><a href="#cb35-61" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-62"><a href="#cb35-62" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> close(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb35-63"><a href="#cb35-63" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="va">self</span>.ws:</span>
-<span id="cb35-64"><a href="#cb35-64" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.ws.close()</span>
-<span id="cb35-65"><a href="#cb35-65" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.ws <span class="op">=</span> <span class="va">None</span></span>
-<span id="cb35-66"><a href="#cb35-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-67"><a href="#cb35-67" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> send(<span class="va">self</span>, method: <span class="bu">str</span>, params: <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span> <span class="op">=</span> <span class="va">None</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
-<span id="cb35-68"><a href="#cb35-68" aria-hidden="true" tabindex="-1"></a>        <span class="co">&quot;&quot;&quot;Send a CDP command and return the result dict.&quot;&quot;&quot;</span></span>
-<span id="cb35-69"><a href="#cb35-69" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> <span class="va">self</span>.ws:</span>
-<span id="cb35-70"><a href="#cb35-70" aria-hidden="true" tabindex="-1"></a>            <span class="cf">raise</span> <span class="pp">RuntimeError</span>(<span class="st">&quot;CDP not connected&quot;</span>)</span>
-<span id="cb35-71"><a href="#cb35-71" aria-hidden="true" tabindex="-1"></a>        <span class="cf">with</span> <span class="va">self</span>._lock:</span>
-<span id="cb35-72"><a href="#cb35-72" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._msg_id <span class="op">+=</span> <span class="dv">1</span></span>
-<span id="cb35-73"><a href="#cb35-73" aria-hidden="true" tabindex="-1"></a>            msg_id <span class="op">=</span> <span class="va">self</span>._msg_id</span>
-<span id="cb35-74"><a href="#cb35-74" aria-hidden="true" tabindex="-1"></a>            payload <span class="op">=</span> {<span class="st">&quot;id&quot;</span>: msg_id, <span class="st">&quot;method&quot;</span>: method, <span class="st">&quot;params&quot;</span>: params <span class="kw">or</span> {}}</span>
-<span id="cb35-75"><a href="#cb35-75" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>.ws.send(json.dumps(payload))</span>
-<span id="cb35-76"><a href="#cb35-76" aria-hidden="true" tabindex="-1"></a>            <span class="cf">while</span> <span class="va">True</span>:</span>
-<span id="cb35-77"><a href="#cb35-77" aria-hidden="true" tabindex="-1"></a>                resp <span class="op">=</span> json.loads(<span class="va">self</span>.ws.recv())</span>
-<span id="cb35-78"><a href="#cb35-78" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> resp.get(<span class="st">&quot;id&quot;</span>) <span class="op">==</span> msg_id:</span>
-<span id="cb35-79"><a href="#cb35-79" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">if</span> <span class="st">&quot;error&quot;</span> <span class="kw">in</span> resp:</span>
-<span id="cb35-80"><a href="#cb35-80" aria-hidden="true" tabindex="-1"></a>                        <span class="cf">raise</span> <span class="pp">RuntimeError</span>(<span class="ss">f&quot;CDP error: </span><span class="sc">{</span>resp[<span class="st">&#39;error&#39;</span>]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb35-81"><a href="#cb35-81" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">return</span> resp.get(<span class="st">&quot;result&quot;</span>, {})</span>
-<span id="cb35-82"><a href="#cb35-82" aria-hidden="true" tabindex="-1"></a>                <span class="co"># Ignore events / other messages</span></span>
-<span id="cb35-83"><a href="#cb35-83" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-84"><a href="#cb35-84" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> evaluate(<span class="va">self</span>, expression: <span class="bu">str</span>, await_promise: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
-<span id="cb35-85"><a href="#cb35-85" aria-hidden="true" tabindex="-1"></a>        <span class="co">&quot;&quot;&quot;Run JavaScript in the page context.&quot;&quot;&quot;</span></span>
-<span id="cb35-86"><a href="#cb35-86" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">self</span>.send(<span class="st">&quot;Runtime.evaluate&quot;</span>, {</span>
-<span id="cb35-87"><a href="#cb35-87" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;expression&quot;</span>: expression,</span>
-<span id="cb35-88"><a href="#cb35-88" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;returnByValue&quot;</span>: <span class="va">True</span>,</span>
-<span id="cb35-89"><a href="#cb35-89" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;awaitPromise&quot;</span>: await_promise,</span>
-<span id="cb35-90"><a href="#cb35-90" aria-hidden="true" tabindex="-1"></a>        })</span>
-<span id="cb35-91"><a href="#cb35-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-92"><a href="#cb35-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-93"><a href="#cb35-93" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-94"><a href="#cb35-94" aria-hidden="true" tabindex="-1"></a><span class="co"># Helpers</span></span>
-<span id="cb35-95"><a href="#cb35-95" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-96"><a href="#cb35-96" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_active_tab() <span class="op">-&gt;</span> <span class="bu">dict</span> <span class="op">|</span> <span class="va">None</span>:</span>
-<span id="cb35-97"><a href="#cb35-97" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Return the first &#39;page&#39; target from CDP /json endpoint.&quot;&quot;&quot;</span></span>
-<span id="cb35-98"><a href="#cb35-98" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb35-99"><a href="#cb35-99" aria-hidden="true" tabindex="-1"></a>        resp <span class="op">=</span> urllib.request.urlopen(</span>
-<span id="cb35-100"><a href="#cb35-100" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f&quot;http://</span><span class="sc">{</span>CDP_HOST<span class="sc">}</span><span class="ss">:</span><span class="sc">{</span>CDP_PORT<span class="sc">}</span><span class="ss">/json&quot;</span>, timeout<span class="op">=</span><span class="dv">5</span></span>
-<span id="cb35-101"><a href="#cb35-101" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb35-102"><a href="#cb35-102" aria-hidden="true" tabindex="-1"></a>        targets <span class="op">=</span> json.loads(resp.read())</span>
-<span id="cb35-103"><a href="#cb35-103" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> t <span class="kw">in</span> targets:</span>
-<span id="cb35-104"><a href="#cb35-104" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> t.get(<span class="st">&quot;type&quot;</span>) <span class="op">==</span> <span class="st">&quot;page&quot;</span>:</span>
-<span id="cb35-105"><a href="#cb35-105" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> t</span>
-<span id="cb35-106"><a href="#cb35-106" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb35-107"><a href="#cb35-107" aria-hidden="true" tabindex="-1"></a>        logger.error(<span class="st">&quot;Failed to fetch CDP target list: </span><span class="sc">%s</span><span class="st">&quot;</span>, e)</span>
-<span id="cb35-108"><a href="#cb35-108" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="va">None</span></span>
-<span id="cb35-109"><a href="#cb35-109" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-110"><a href="#cb35-110" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-111"><a href="#cb35-111" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_page_content(cdp: CDPClient) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb35-112"><a href="#cb35-112" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Extract readable text content from current page.&quot;&quot;&quot;</span></span>
-<span id="cb35-113"><a href="#cb35-113" aria-hidden="true" tabindex="-1"></a>    script <span class="op">=</span> <span class="vs">r&quot;&quot;&quot;</span></span>
-<span id="cb35-114"><a href="#cb35-114" aria-hidden="true" tabindex="-1"></a><span class="vs">    </span><span class="kw">(</span><span class="vs">function</span><span class="kw">()</span><span class="vs"> {</span></span>
-<span id="cb35-115"><a href="#cb35-115" aria-hidden="true" tabindex="-1"></a><span class="vs">        var article = document</span><span class="dv">.</span><span class="vs">querySelector</span><span class="kw">(</span><span class="vs">&#39;article&#39;</span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-116"><a href="#cb35-116" aria-hidden="true" tabindex="-1"></a><span class="vs">        var main = document</span><span class="dv">.</span><span class="vs">querySelector</span><span class="kw">(</span><span class="vs">&#39;main&#39;</span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-117"><a href="#cb35-117" aria-hidden="true" tabindex="-1"></a><span class="vs">        var body = document</span><span class="dv">.</span><span class="vs">body;</span></span>
-<span id="cb35-118"><a href="#cb35-118" aria-hidden="true" tabindex="-1"></a><span class="vs">        var el = article </span><span class="cf">||</span><span class="vs"> main </span><span class="cf">||</span><span class="vs"> body;</span></span>
-<span id="cb35-119"><a href="#cb35-119" aria-hidden="true" tabindex="-1"></a><span class="vs">        if </span><span class="kw">(</span><span class="vs">!el</span><span class="kw">)</span><span class="vs"> return &#39;&#39;;</span></span>
-<span id="cb35-120"><a href="#cb35-120" aria-hidden="true" tabindex="-1"></a><span class="vs">        var clone = el</span><span class="dv">.</span><span class="vs">cloneNode</span><span class="kw">(</span><span class="vs">true</span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-121"><a href="#cb35-121" aria-hidden="true" tabindex="-1"></a><span class="vs">        var removes = clone</span><span class="dv">.</span><span class="vs">querySelectorAll</span><span class="kw">(</span></span>
-<span id="cb35-122"><a href="#cb35-122" aria-hidden="true" tabindex="-1"></a><span class="vs">            &#39;script, style, noscript, svg, nav, footer, header, iframe, &#39; </span><span class="op">+</span></span>
-<span id="cb35-123"><a href="#cb35-123" aria-hidden="true" tabindex="-1"></a><span class="vs">            &#39;</span><span class="pp">[hidden]</span><span class="vs">, </span><span class="pp">[aria-hidden=&quot;true&quot;]</span><span class="vs">, </span><span class="dv">.</span><span class="vs">sidebar, </span><span class="dv">.</span><span class="vs">ad, </span><span class="dv">.</span><span class="vs">advertisement&#39;</span></span>
-<span id="cb35-124"><a href="#cb35-124" aria-hidden="true" tabindex="-1"></a><span class="vs">        </span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-125"><a href="#cb35-125" aria-hidden="true" tabindex="-1"></a><span class="vs">        removes</span><span class="dv">.</span><span class="vs">forEach</span><span class="kw">(</span><span class="vs">function</span><span class="kw">(</span><span class="vs">n</span><span class="kw">)</span><span class="vs"> { n</span><span class="dv">.</span><span class="vs">remove</span><span class="kw">()</span><span class="vs">; }</span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-126"><a href="#cb35-126" aria-hidden="true" tabindex="-1"></a><span class="vs">        var text = clone</span><span class="dv">.</span><span class="vs">innerText </span><span class="cf">||</span><span class="vs"> clone</span><span class="dv">.</span><span class="vs">textContent </span><span class="cf">||</span><span class="vs"> &#39;&#39;;</span></span>
-<span id="cb35-127"><a href="#cb35-127" aria-hidden="true" tabindex="-1"></a><span class="vs">        text = text</span><span class="dv">.</span><span class="vs">replace</span><span class="kw">(</span><span class="vs">/</span><span class="pp">[ </span><span class="ch">\t</span><span class="pp">]</span><span class="op">+</span><span class="vs">/g, &#39; &#39;</span><span class="kw">)</span><span class="dv">.</span><span class="vs">replace</span><span class="kw">(</span><span class="vs">/</span><span class="ch">\n</span><span class="op">{3,}</span><span class="vs">/g, &#39;</span><span class="ch">\n\n</span><span class="vs">&#39;</span><span class="kw">)</span><span class="dv">.</span><span class="vs">trim</span><span class="kw">()</span><span class="vs">;</span></span>
-<span id="cb35-128"><a href="#cb35-128" aria-hidden="true" tabindex="-1"></a><span class="vs">        if </span><span class="kw">(</span><span class="vs">text</span><span class="dv">.</span><span class="vs">length &gt; 50000</span><span class="kw">)</span><span class="vs"> text = text</span><span class="dv">.</span><span class="vs">substring</span><span class="kw">(</span><span class="vs">0, 50000</span><span class="kw">)</span><span class="vs"> </span><span class="op">+</span><span class="vs"> &#39;</span><span class="ch">\n\n</span><span class="dv">...</span><span class="vs"> </span><span class="pp">[TRUNCATED]</span><span class="vs">&#39;;</span></span>
-<span id="cb35-129"><a href="#cb35-129" aria-hidden="true" tabindex="-1"></a><span class="vs">        return text;</span></span>
-<span id="cb35-130"><a href="#cb35-130" aria-hidden="true" tabindex="-1"></a><span class="vs">    }</span><span class="kw">)()</span></span>
-<span id="cb35-131"><a href="#cb35-131" aria-hidden="true" tabindex="-1"></a><span class="vs">    &quot;&quot;&quot;</span></span>
-<span id="cb35-132"><a href="#cb35-132" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> cdp.evaluate(script)</span>
-<span id="cb35-133"><a href="#cb35-133" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> result.get(<span class="st">&quot;result&quot;</span>, {}).get(<span class="st">&quot;value&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-134"><a href="#cb35-134" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-135"><a href="#cb35-135" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-136"><a href="#cb35-136" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_page_metadata(cdp: CDPClient) <span class="op">-&gt;</span> <span class="bu">dict</span>:</span>
-<span id="cb35-137"><a href="#cb35-137" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Extract page metadata.&quot;&quot;&quot;</span></span>
-<span id="cb35-138"><a href="#cb35-138" aria-hidden="true" tabindex="-1"></a>    script <span class="op">=</span> <span class="vs">r&quot;&quot;&quot;</span></span>
-<span id="cb35-139"><a href="#cb35-139" aria-hidden="true" tabindex="-1"></a><span class="vs">    </span><span class="kw">(</span><span class="vs">function</span><span class="kw">()</span><span class="vs"> {</span></span>
-<span id="cb35-140"><a href="#cb35-140" aria-hidden="true" tabindex="-1"></a><span class="vs">        var meta = {};</span></span>
-<span id="cb35-141"><a href="#cb35-141" aria-hidden="true" tabindex="-1"></a><span class="vs">        meta</span><span class="dv">.</span><span class="vs">title = document</span><span class="dv">.</span><span class="vs">title </span><span class="cf">||</span><span class="vs"> &#39;&#39;;</span></span>
-<span id="cb35-142"><a href="#cb35-142" aria-hidden="true" tabindex="-1"></a><span class="vs">        var desc = document</span><span class="dv">.</span><span class="vs">querySelector</span><span class="kw">(</span><span class="vs">&#39;meta</span><span class="pp">[name=&quot;description&quot;]</span><span class="vs">&#39;</span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-143"><a href="#cb35-143" aria-hidden="true" tabindex="-1"></a><span class="vs">        meta</span><span class="dv">.</span><span class="vs">description = desc </span><span class="op">?</span><span class="vs"> desc</span><span class="dv">.</span><span class="vs">getAttribute</span><span class="kw">(</span><span class="vs">&#39;content&#39;</span><span class="kw">)</span><span class="vs"> : &#39;&#39;;</span></span>
-<span id="cb35-144"><a href="#cb35-144" aria-hidden="true" tabindex="-1"></a><span class="vs">        var author = document</span><span class="dv">.</span><span class="vs">querySelector</span><span class="kw">(</span><span class="vs">&#39;meta</span><span class="pp">[name=&quot;author&quot;]</span><span class="vs">&#39;</span><span class="kw">)</span><span class="vs">;</span></span>
-<span id="cb35-145"><a href="#cb35-145" aria-hidden="true" tabindex="-1"></a><span class="vs">        meta</span><span class="dv">.</span><span class="vs">author = author </span><span class="op">?</span><span class="vs"> author</span><span class="dv">.</span><span class="vs">getAttribute</span><span class="kw">(</span><span class="vs">&#39;content&#39;</span><span class="kw">)</span><span class="vs"> : &#39;&#39;;</span></span>
-<span id="cb35-146"><a href="#cb35-146" aria-hidden="true" tabindex="-1"></a><span class="vs">        meta</span><span class="dv">.</span><span class="vs">language = document</span><span class="dv">.</span><span class="vs">documentElement</span><span class="dv">.</span><span class="vs">lang </span><span class="cf">||</span><span class="vs"> &#39;&#39;;</span></span>
-<span id="cb35-147"><a href="#cb35-147" aria-hidden="true" tabindex="-1"></a><span class="vs">        return meta;</span></span>
-<span id="cb35-148"><a href="#cb35-148" aria-hidden="true" tabindex="-1"></a><span class="vs">    }</span><span class="kw">)()</span></span>
-<span id="cb35-149"><a href="#cb35-149" aria-hidden="true" tabindex="-1"></a><span class="vs">    &quot;&quot;&quot;</span></span>
-<span id="cb35-150"><a href="#cb35-150" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> cdp.evaluate(script)</span>
-<span id="cb35-151"><a href="#cb35-151" aria-hidden="true" tabindex="-1"></a>    value <span class="op">=</span> result.get(<span class="st">&quot;result&quot;</span>, {}).get(<span class="st">&quot;value&quot;</span>, {})</span>
-<span id="cb35-152"><a href="#cb35-152" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="bu">isinstance</span>(value, <span class="bu">str</span>):</span>
-<span id="cb35-153"><a href="#cb35-153" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
-<span id="cb35-154"><a href="#cb35-154" aria-hidden="true" tabindex="-1"></a>            value <span class="op">=</span> json.loads(value)</span>
-<span id="cb35-155"><a href="#cb35-155" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> json.JSONDecodeError:</span>
-<span id="cb35-156"><a href="#cb35-156" aria-hidden="true" tabindex="-1"></a>            value <span class="op">=</span> {<span class="st">&quot;title&quot;</span>: value}</span>
-<span id="cb35-157"><a href="#cb35-157" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> value</span>
-<span id="cb35-158"><a href="#cb35-158" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-159"><a href="#cb35-159" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-160"><a href="#cb35-160" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-161"><a href="#cb35-161" aria-hidden="true" tabindex="-1"></a><span class="co"># MCP HTTP Handler</span></span>
-<span id="cb35-162"><a href="#cb35-162" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-163"><a href="#cb35-163" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> MCPHandler(http.server.BaseHTTPRequestHandler):</span>
-<span id="cb35-164"><a href="#cb35-164" aria-hidden="true" tabindex="-1"></a>    <span class="co">&quot;&quot;&quot;Handles MCP JSON-RPC over HTTP.&quot;&quot;&quot;</span></span>
-<span id="cb35-165"><a href="#cb35-165" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-166"><a href="#cb35-166" aria-hidden="true" tabindex="-1"></a>    protocol_version <span class="op">=</span> <span class="st">&quot;HTTP/1.0&quot;</span></span>
-<span id="cb35-167"><a href="#cb35-167" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-168"><a href="#cb35-168" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _send_json(<span class="va">self</span>, data: <span class="bu">dict</span>, status: <span class="bu">int</span> <span class="op">=</span> <span class="dv">200</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb35-169"><a href="#cb35-169" aria-hidden="true" tabindex="-1"></a>        body <span class="op">=</span> json.dumps(data, ensure_ascii<span class="op">=</span><span class="va">False</span>).encode(<span class="st">&quot;utf-8&quot;</span>)</span>
-<span id="cb35-170"><a href="#cb35-170" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.send_response(status)</span>
-<span id="cb35-171"><a href="#cb35-171" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.send_header(<span class="st">&quot;Content-Type&quot;</span>, <span class="st">&quot;application/json; charset=utf-8&quot;</span>)</span>
-<span id="cb35-172"><a href="#cb35-172" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.send_header(<span class="st">&quot;Content-Length&quot;</span>, <span class="bu">str</span>(<span class="bu">len</span>(body)))</span>
-<span id="cb35-173"><a href="#cb35-173" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.send_header(<span class="st">&quot;Connection&quot;</span>, <span class="st">&quot;close&quot;</span>)</span>
-<span id="cb35-174"><a href="#cb35-174" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.end_headers()</span>
-<span id="cb35-175"><a href="#cb35-175" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>.wfile.write(body)</span>
-<span id="cb35-176"><a href="#cb35-176" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-177"><a href="#cb35-177" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> do_GET(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb35-178"><a href="#cb35-178" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._send_json({<span class="st">&quot;error&quot;</span>: <span class="st">&quot;use POST&quot;</span>}, <span class="dv">405</span>)</span>
-<span id="cb35-179"><a href="#cb35-179" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-180"><a href="#cb35-180" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> do_POST(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="va">None</span>:</span>
-<span id="cb35-181"><a href="#cb35-181" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
-<span id="cb35-182"><a href="#cb35-182" aria-hidden="true" tabindex="-1"></a>            body_len <span class="op">=</span> <span class="bu">int</span>(<span class="va">self</span>.headers.get(<span class="st">&quot;Content-Length&quot;</span>, <span class="dv">0</span>))</span>
-<span id="cb35-183"><a href="#cb35-183" aria-hidden="true" tabindex="-1"></a>            body <span class="op">=</span> json.loads(<span class="va">self</span>.rfile.read(body_len)) <span class="cf">if</span> body_len <span class="cf">else</span> {}</span>
-<span id="cb35-184"><a href="#cb35-184" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> (json.JSONDecodeError, <span class="pp">ValueError</span>) <span class="im">as</span> e:</span>
-<span id="cb35-185"><a href="#cb35-185" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._send_json(</span>
-<span id="cb35-186"><a href="#cb35-186" aria-hidden="true" tabindex="-1"></a>                {<span class="st">&quot;jsonrpc&quot;</span>: <span class="st">&quot;2.0&quot;</span>, <span class="st">&quot;error&quot;</span>: {<span class="st">&quot;code&quot;</span>: <span class="op">-</span><span class="dv">32700</span>, <span class="st">&quot;message&quot;</span>: <span class="bu">str</span>(e)}}, <span class="dv">400</span></span>
-<span id="cb35-187"><a href="#cb35-187" aria-hidden="true" tabindex="-1"></a>            )</span>
-<span id="cb35-188"><a href="#cb35-188" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span></span>
-<span id="cb35-189"><a href="#cb35-189" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-190"><a href="#cb35-190" aria-hidden="true" tabindex="-1"></a>        method <span class="op">=</span> body.get(<span class="st">&quot;method&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-191"><a href="#cb35-191" aria-hidden="true" tabindex="-1"></a>        req_id <span class="op">=</span> body.get(<span class="st">&quot;id&quot;</span>, <span class="dv">0</span>)</span>
-<span id="cb35-192"><a href="#cb35-192" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-193"><a href="#cb35-193" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- MCP protocol handshake ---</span></span>
-<span id="cb35-194"><a href="#cb35-194" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> method <span class="op">==</span> <span class="st">&quot;initialize&quot;</span>:</span>
-<span id="cb35-195"><a href="#cb35-195" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._send_json({</span>
-<span id="cb35-196"><a href="#cb35-196" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;jsonrpc&quot;</span>: <span class="st">&quot;2.0&quot;</span>,</span>
-<span id="cb35-197"><a href="#cb35-197" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;id&quot;</span>: req_id,</span>
-<span id="cb35-198"><a href="#cb35-198" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;result&quot;</span>: {</span>
-<span id="cb35-199"><a href="#cb35-199" aria-hidden="true" tabindex="-1"></a>                    <span class="st">&quot;protocolVersion&quot;</span>: <span class="st">&quot;2025-06-18&quot;</span>,</span>
-<span id="cb35-200"><a href="#cb35-200" aria-hidden="true" tabindex="-1"></a>                    <span class="st">&quot;capabilities&quot;</span>: {<span class="st">&quot;tools&quot;</span>: {}},</span>
-<span id="cb35-201"><a href="#cb35-201" aria-hidden="true" tabindex="-1"></a>                    <span class="st">&quot;serverInfo&quot;</span>: {<span class="st">&quot;name&quot;</span>: <span class="st">&quot;ChromeMCP-CDP&quot;</span>, <span class="st">&quot;version&quot;</span>: <span class="st">&quot;2.0&quot;</span>},</span>
-<span id="cb35-202"><a href="#cb35-202" aria-hidden="true" tabindex="-1"></a>                },</span>
-<span id="cb35-203"><a href="#cb35-203" aria-hidden="true" tabindex="-1"></a>            })</span>
-<span id="cb35-204"><a href="#cb35-204" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span></span>
-<span id="cb35-205"><a href="#cb35-205" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-206"><a href="#cb35-206" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> method <span class="op">==</span> <span class="st">&quot;notifications/initialized&quot;</span>:</span>
-<span id="cb35-207"><a href="#cb35-207" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._send_json({<span class="st">&quot;jsonrpc&quot;</span>: <span class="st">&quot;2.0&quot;</span>, <span class="st">&quot;id&quot;</span>: req_id, <span class="st">&quot;result&quot;</span>: {}})</span>
-<span id="cb35-208"><a href="#cb35-208" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span></span>
-<span id="cb35-209"><a href="#cb35-209" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-210"><a href="#cb35-210" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- tools/list ---</span></span>
-<span id="cb35-211"><a href="#cb35-211" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> method <span class="op">==</span> <span class="st">&quot;tools/list&quot;</span>:</span>
-<span id="cb35-212"><a href="#cb35-212" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._send_json({</span>
-<span id="cb35-213"><a href="#cb35-213" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;jsonrpc&quot;</span>: <span class="st">&quot;2.0&quot;</span>,</span>
-<span id="cb35-214"><a href="#cb35-214" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;id&quot;</span>: req_id,</span>
-<span id="cb35-215"><a href="#cb35-215" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;result&quot;</span>: {</span>
-<span id="cb35-216"><a href="#cb35-216" aria-hidden="true" tabindex="-1"></a>                    <span class="st">&quot;tools&quot;</span>: [</span>
-<span id="cb35-217"><a href="#cb35-217" aria-hidden="true" tabindex="-1"></a>                        {</span>
-<span id="cb35-218"><a href="#cb35-218" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;name&quot;</span>: <span class="st">&quot;chrome_navigate&quot;</span>,</span>
-<span id="cb35-219"><a href="#cb35-219" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;description&quot;</span>: <span class="st">&quot;打开指定URL的网页，并返回页面标题和URL&quot;</span>,</span>
-<span id="cb35-220"><a href="#cb35-220" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;inputSchema&quot;</span>: {</span>
-<span id="cb35-221"><a href="#cb35-221" aria-hidden="true" tabindex="-1"></a>                                <span class="st">&quot;type&quot;</span>: <span class="st">&quot;object&quot;</span>,</span>
-<span id="cb35-222"><a href="#cb35-222" aria-hidden="true" tabindex="-1"></a>                                <span class="st">&quot;properties&quot;</span>: {</span>
-<span id="cb35-223"><a href="#cb35-223" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">&quot;url&quot;</span>: {</span>
-<span id="cb35-224"><a href="#cb35-224" aria-hidden="true" tabindex="-1"></a>                                        <span class="st">&quot;type&quot;</span>: <span class="st">&quot;string&quot;</span>,</span>
-<span id="cb35-225"><a href="#cb35-225" aria-hidden="true" tabindex="-1"></a>                                        <span class="st">&quot;description&quot;</span>: <span class="st">&quot;要打开的网页URL&quot;</span>,</span>
-<span id="cb35-226"><a href="#cb35-226" aria-hidden="true" tabindex="-1"></a>                                    },</span>
-<span id="cb35-227"><a href="#cb35-227" aria-hidden="true" tabindex="-1"></a>                                },</span>
-<span id="cb35-228"><a href="#cb35-228" aria-hidden="true" tabindex="-1"></a>                                <span class="st">&quot;required&quot;</span>: [<span class="st">&quot;url&quot;</span>],</span>
-<span id="cb35-229"><a href="#cb35-229" aria-hidden="true" tabindex="-1"></a>                            },</span>
-<span id="cb35-230"><a href="#cb35-230" aria-hidden="true" tabindex="-1"></a>                        },</span>
-<span id="cb35-231"><a href="#cb35-231" aria-hidden="true" tabindex="-1"></a>                        {</span>
-<span id="cb35-232"><a href="#cb35-232" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;name&quot;</span>: <span class="st">&quot;chrome_get_web_content&quot;</span>,</span>
-<span id="cb35-233"><a href="#cb35-233" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;description&quot;</span>: <span class="st">&quot;获取当前活跃网页的完整文本内容，包括标题、正文、元数据&quot;</span>,</span>
-<span id="cb35-234"><a href="#cb35-234" aria-hidden="true" tabindex="-1"></a>                            <span class="st">&quot;inputSchema&quot;</span>: {</span>
-<span id="cb35-235"><a href="#cb35-235" aria-hidden="true" tabindex="-1"></a>                                <span class="st">&quot;type&quot;</span>: <span class="st">&quot;object&quot;</span>,</span>
-<span id="cb35-236"><a href="#cb35-236" aria-hidden="true" tabindex="-1"></a>                                <span class="st">&quot;properties&quot;</span>: {</span>
-<span id="cb35-237"><a href="#cb35-237" aria-hidden="true" tabindex="-1"></a>                                    <span class="st">&quot;url&quot;</span>: {</span>
-<span id="cb35-238"><a href="#cb35-238" aria-hidden="true" tabindex="-1"></a>                                        <span class="st">&quot;type&quot;</span>: <span class="st">&quot;string&quot;</span>,</span>
-<span id="cb35-239"><a href="#cb35-239" aria-hidden="true" tabindex="-1"></a>                                        <span class="st">&quot;description&quot;</span>: <span class="st">&quot;可选：先导航到此URL再获取内容&quot;</span>,</span>
-<span id="cb35-240"><a href="#cb35-240" aria-hidden="true" tabindex="-1"></a>                                    },</span>
-<span id="cb35-241"><a href="#cb35-241" aria-hidden="true" tabindex="-1"></a>                                },</span>
-<span id="cb35-242"><a href="#cb35-242" aria-hidden="true" tabindex="-1"></a>                            },</span>
-<span id="cb35-243"><a href="#cb35-243" aria-hidden="true" tabindex="-1"></a>                        },</span>
-<span id="cb35-244"><a href="#cb35-244" aria-hidden="true" tabindex="-1"></a>                    ],</span>
-<span id="cb35-245"><a href="#cb35-245" aria-hidden="true" tabindex="-1"></a>                },</span>
-<span id="cb35-246"><a href="#cb35-246" aria-hidden="true" tabindex="-1"></a>            })</span>
-<span id="cb35-247"><a href="#cb35-247" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span></span>
-<span id="cb35-248"><a href="#cb35-248" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-249"><a href="#cb35-249" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- tools/call ---</span></span>
-<span id="cb35-250"><a href="#cb35-250" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> method <span class="op">==</span> <span class="st">&quot;tools/call&quot;</span>:</span>
-<span id="cb35-251"><a href="#cb35-251" aria-hidden="true" tabindex="-1"></a>            params <span class="op">=</span> body.get(<span class="st">&quot;params&quot;</span>, {})</span>
-<span id="cb35-252"><a href="#cb35-252" aria-hidden="true" tabindex="-1"></a>            tool_name <span class="op">=</span> params.get(<span class="st">&quot;name&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-253"><a href="#cb35-253" aria-hidden="true" tabindex="-1"></a>            args <span class="op">=</span> params.get(<span class="st">&quot;arguments&quot;</span>, {})</span>
-<span id="cb35-254"><a href="#cb35-254" aria-hidden="true" tabindex="-1"></a>            tool_result <span class="op">=</span> <span class="va">self</span>._execute_tool(tool_name, args)</span>
-<span id="cb35-255"><a href="#cb35-255" aria-hidden="true" tabindex="-1"></a>            <span class="va">self</span>._send_json({</span>
-<span id="cb35-256"><a href="#cb35-256" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;jsonrpc&quot;</span>: <span class="st">&quot;2.0&quot;</span>,</span>
-<span id="cb35-257"><a href="#cb35-257" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;id&quot;</span>: req_id,</span>
-<span id="cb35-258"><a href="#cb35-258" aria-hidden="true" tabindex="-1"></a>                <span class="st">&quot;result&quot;</span>: {<span class="st">&quot;content&quot;</span>: [{<span class="st">&quot;type&quot;</span>: <span class="st">&quot;text&quot;</span>, <span class="st">&quot;text&quot;</span>: tool_result}]},</span>
-<span id="cb35-259"><a href="#cb35-259" aria-hidden="true" tabindex="-1"></a>            })</span>
-<span id="cb35-260"><a href="#cb35-260" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span></span>
-<span id="cb35-261"><a href="#cb35-261" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-262"><a href="#cb35-262" aria-hidden="true" tabindex="-1"></a>        <span class="co"># --- unknown ---</span></span>
-<span id="cb35-263"><a href="#cb35-263" aria-hidden="true" tabindex="-1"></a>        <span class="va">self</span>._send_json({</span>
-<span id="cb35-264"><a href="#cb35-264" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;jsonrpc&quot;</span>: <span class="st">&quot;2.0&quot;</span>,</span>
-<span id="cb35-265"><a href="#cb35-265" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;id&quot;</span>: req_id,</span>
-<span id="cb35-266"><a href="#cb35-266" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;error&quot;</span>: {<span class="st">&quot;code&quot;</span>: <span class="op">-</span><span class="dv">32601</span>, <span class="st">&quot;message&quot;</span>: <span class="ss">f&quot;unknown method: </span><span class="sc">{</span>method<span class="sc">}</span><span class="ss">&quot;</span>},</span>
-<span id="cb35-267"><a href="#cb35-267" aria-hidden="true" tabindex="-1"></a>        })</span>
-<span id="cb35-268"><a href="#cb35-268" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-269"><a href="#cb35-269" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _execute_tool(<span class="va">self</span>, name: <span class="bu">str</span>, args: <span class="bu">dict</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb35-270"><a href="#cb35-270" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> name <span class="op">==</span> <span class="st">&quot;chrome_navigate&quot;</span>:</span>
-<span id="cb35-271"><a href="#cb35-271" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">self</span>._chrome_navigate(args.get(<span class="st">&quot;url&quot;</span>, <span class="st">&quot;&quot;</span>))</span>
-<span id="cb35-272"><a href="#cb35-272" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> name <span class="op">==</span> <span class="st">&quot;chrome_get_web_content&quot;</span>:</span>
-<span id="cb35-273"><a href="#cb35-273" aria-hidden="true" tabindex="-1"></a>            target_url <span class="op">=</span> args.get(<span class="st">&quot;url&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-274"><a href="#cb35-274" aria-hidden="true" tabindex="-1"></a>            <span class="cf">if</span> target_url:</span>
-<span id="cb35-275"><a href="#cb35-275" aria-hidden="true" tabindex="-1"></a>                nav_result <span class="op">=</span> <span class="va">self</span>._chrome_navigate(target_url)</span>
-<span id="cb35-276"><a href="#cb35-276" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> <span class="st">&quot;错误&quot;</span> <span class="kw">in</span> nav_result:</span>
-<span id="cb35-277"><a href="#cb35-277" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">return</span> <span class="ss">f&quot;Navigation failed: </span><span class="sc">{</span>nav_result<span class="sc">}</span><span class="ss">&quot;</span></span>
-<span id="cb35-278"><a href="#cb35-278" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="va">self</span>._chrome_get_web_content()</span>
-<span id="cb35-279"><a href="#cb35-279" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="ss">f&quot;Unknown tool: </span><span class="sc">{</span>name<span class="sc">}</span><span class="ss">&quot;</span></span>
-<span id="cb35-280"><a href="#cb35-280" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-281"><a href="#cb35-281" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _chrome_navigate(<span class="va">self</span>, url: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb35-282"><a href="#cb35-282" aria-hidden="true" tabindex="-1"></a>        <span class="co">&quot;&quot;&quot;Navigate to a URL using CDP.&quot;&quot;&quot;</span></span>
-<span id="cb35-283"><a href="#cb35-283" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> url:</span>
-<span id="cb35-284"><a href="#cb35-284" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="st">&quot;错误: 未提供URL&quot;</span></span>
-<span id="cb35-285"><a href="#cb35-285" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-286"><a href="#cb35-286" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Method 1: Create new tab</span></span>
-<span id="cb35-287"><a href="#cb35-287" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
-<span id="cb35-288"><a href="#cb35-288" aria-hidden="true" tabindex="-1"></a>            req <span class="op">=</span> urllib.request.Request(</span>
-<span id="cb35-289"><a href="#cb35-289" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f&quot;http://</span><span class="sc">{</span>CDP_HOST<span class="sc">}</span><span class="ss">:</span><span class="sc">{</span>CDP_PORT<span class="sc">}</span><span class="ss">/json/new?&quot;</span></span>
-<span id="cb35-290"><a href="#cb35-290" aria-hidden="true" tabindex="-1"></a>                <span class="ss">f&quot;</span><span class="sc">{</span>urllib<span class="sc">.</span>parse<span class="sc">.</span>quote(url, safe<span class="op">=</span><span class="st">&#39;&#39;</span>)<span class="sc">}</span><span class="ss">&quot;</span>,</span>
-<span id="cb35-291"><a href="#cb35-291" aria-hidden="true" tabindex="-1"></a>                method<span class="op">=</span><span class="st">&quot;PUT&quot;</span>,</span>
-<span id="cb35-292"><a href="#cb35-292" aria-hidden="true" tabindex="-1"></a>            )</span>
-<span id="cb35-293"><a href="#cb35-293" aria-hidden="true" tabindex="-1"></a>            <span class="cf">with</span> urllib.request.urlopen(req, timeout<span class="op">=</span><span class="dv">10</span>) <span class="im">as</span> r:</span>
-<span id="cb35-294"><a href="#cb35-294" aria-hidden="true" tabindex="-1"></a>                tab_info <span class="op">=</span> json.loads(r.read())</span>
-<span id="cb35-295"><a href="#cb35-295" aria-hidden="true" tabindex="-1"></a>                ws_url <span class="op">=</span> tab_info.get(<span class="st">&quot;webSocketDebuggerUrl&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-296"><a href="#cb35-296" aria-hidden="true" tabindex="-1"></a>                cdp <span class="op">=</span> CDPClient(ws_url)</span>
-<span id="cb35-297"><a href="#cb35-297" aria-hidden="true" tabindex="-1"></a>                cdp.<span class="ex">connect</span>()</span>
-<span id="cb35-298"><a href="#cb35-298" aria-hidden="true" tabindex="-1"></a>                <span class="cf">try</span>:</span>
-<span id="cb35-299"><a href="#cb35-299" aria-hidden="true" tabindex="-1"></a>                    cdp.send(<span class="st">&quot;Page.enable&quot;</span>)</span>
-<span id="cb35-300"><a href="#cb35-300" aria-hidden="true" tabindex="-1"></a>                    time.sleep(<span class="dv">1</span>)</span>
-<span id="cb35-301"><a href="#cb35-301" aria-hidden="true" tabindex="-1"></a>                    result <span class="op">=</span> cdp.evaluate(<span class="st">&quot;document.title&quot;</span>)</span>
-<span id="cb35-302"><a href="#cb35-302" aria-hidden="true" tabindex="-1"></a>                    title <span class="op">=</span> result.get(<span class="st">&quot;result&quot;</span>, {}).get(<span class="st">&quot;value&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-303"><a href="#cb35-303" aria-hidden="true" tabindex="-1"></a>                <span class="cf">finally</span>:</span>
-<span id="cb35-304"><a href="#cb35-304" aria-hidden="true" tabindex="-1"></a>                    cdp.close()</span>
-<span id="cb35-305"><a href="#cb35-305" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> <span class="ss">f&quot;已打开 </span><span class="sc">{</span>url<span class="sc">}</span><span class="ch">\n</span><span class="ss">标题: </span><span class="sc">{</span>title<span class="sc">}</span><span class="ss">&quot;</span></span>
-<span id="cb35-306"><a href="#cb35-306" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb35-307"><a href="#cb35-307" aria-hidden="true" tabindex="-1"></a>            logger.error(<span class="st">&quot;Navigate method 1 error: </span><span class="sc">%s</span><span class="st">&quot;</span>, e)</span>
-<span id="cb35-308"><a href="#cb35-308" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-309"><a href="#cb35-309" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Method 2: Navigate existing tab</span></span>
-<span id="cb35-310"><a href="#cb35-310" aria-hidden="true" tabindex="-1"></a>        tab <span class="op">=</span> get_active_tab()</span>
-<span id="cb35-311"><a href="#cb35-311" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> tab <span class="kw">and</span> tab.get(<span class="st">&quot;webSocketDebuggerUrl&quot;</span>):</span>
-<span id="cb35-312"><a href="#cb35-312" aria-hidden="true" tabindex="-1"></a>            <span class="cf">try</span>:</span>
-<span id="cb35-313"><a href="#cb35-313" aria-hidden="true" tabindex="-1"></a>                cdp <span class="op">=</span> CDPClient(tab[<span class="st">&quot;webSocketDebuggerUrl&quot;</span>])</span>
-<span id="cb35-314"><a href="#cb35-314" aria-hidden="true" tabindex="-1"></a>                cdp.<span class="ex">connect</span>()</span>
-<span id="cb35-315"><a href="#cb35-315" aria-hidden="true" tabindex="-1"></a>                <span class="cf">try</span>:</span>
-<span id="cb35-316"><a href="#cb35-316" aria-hidden="true" tabindex="-1"></a>                    cdp.send(<span class="st">&quot;Page.enable&quot;</span>)</span>
-<span id="cb35-317"><a href="#cb35-317" aria-hidden="true" tabindex="-1"></a>                    cdp.send(<span class="st">&quot;Page.navigate&quot;</span>, {<span class="st">&quot;url&quot;</span>: url})</span>
-<span id="cb35-318"><a href="#cb35-318" aria-hidden="true" tabindex="-1"></a>                    time.sleep(<span class="dv">1</span>)</span>
-<span id="cb35-319"><a href="#cb35-319" aria-hidden="true" tabindex="-1"></a>                    title <span class="op">=</span> (</span>
-<span id="cb35-320"><a href="#cb35-320" aria-hidden="true" tabindex="-1"></a>                        cdp.evaluate(<span class="st">&quot;document.title&quot;</span>)</span>
-<span id="cb35-321"><a href="#cb35-321" aria-hidden="true" tabindex="-1"></a>                        .get(<span class="st">&quot;result&quot;</span>, {})</span>
-<span id="cb35-322"><a href="#cb35-322" aria-hidden="true" tabindex="-1"></a>                        .get(<span class="st">&quot;value&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-323"><a href="#cb35-323" aria-hidden="true" tabindex="-1"></a>                    )</span>
-<span id="cb35-324"><a href="#cb35-324" aria-hidden="true" tabindex="-1"></a>                <span class="cf">finally</span>:</span>
-<span id="cb35-325"><a href="#cb35-325" aria-hidden="true" tabindex="-1"></a>                    cdp.close()</span>
-<span id="cb35-326"><a href="#cb35-326" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> <span class="ss">f&quot;已导航到 </span><span class="sc">{</span>url<span class="sc">}</span><span class="ch">\n</span><span class="ss">标题: </span><span class="sc">{</span>title<span class="sc">}</span><span class="ss">&quot;</span></span>
-<span id="cb35-327"><a href="#cb35-327" aria-hidden="true" tabindex="-1"></a>            <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e2:</span>
-<span id="cb35-328"><a href="#cb35-328" aria-hidden="true" tabindex="-1"></a>                logger.error(<span class="st">&quot;Navigate method 2 error: </span><span class="sc">%s</span><span class="st">&quot;</span>, e2)</span>
-<span id="cb35-329"><a href="#cb35-329" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-330"><a href="#cb35-330" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> (</span>
-<span id="cb35-331"><a href="#cb35-331" aria-hidden="true" tabindex="-1"></a>            <span class="ss">f&quot;错误: 无法打开 </span><span class="sc">{</span>url<span class="sc">}</span><span class="ss">，&quot;</span></span>
-<span id="cb35-332"><a href="#cb35-332" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;请确认 Chromium 正在运行并开启了调试端口 9223&quot;</span></span>
-<span id="cb35-333"><a href="#cb35-333" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb35-334"><a href="#cb35-334" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-335"><a href="#cb35-335" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> _chrome_get_web_content(<span class="va">self</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
-<span id="cb35-336"><a href="#cb35-336" aria-hidden="true" tabindex="-1"></a>        <span class="co">&quot;&quot;&quot;Get full page content using CDP.&quot;&quot;&quot;</span></span>
-<span id="cb35-337"><a href="#cb35-337" aria-hidden="true" tabindex="-1"></a>        tab <span class="op">=</span> get_active_tab()</span>
-<span id="cb35-338"><a href="#cb35-338" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> tab:</span>
-<span id="cb35-339"><a href="#cb35-339" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="st">&quot;错误: 没有活跃的网页标签页&quot;</span></span>
-<span id="cb35-340"><a href="#cb35-340" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-341"><a href="#cb35-341" aria-hidden="true" tabindex="-1"></a>        ws_url <span class="op">=</span> tab.get(<span class="st">&quot;webSocketDebuggerUrl&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-342"><a href="#cb35-342" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> <span class="kw">not</span> ws_url:</span>
-<span id="cb35-343"><a href="#cb35-343" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="st">&quot;错误: 无法获取页面调试 URL&quot;</span></span>
-<span id="cb35-344"><a href="#cb35-344" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-345"><a href="#cb35-345" aria-hidden="true" tabindex="-1"></a>        <span class="cf">try</span>:</span>
-<span id="cb35-346"><a href="#cb35-346" aria-hidden="true" tabindex="-1"></a>            cdp <span class="op">=</span> CDPClient(ws_url)</span>
-<span id="cb35-347"><a href="#cb35-347" aria-hidden="true" tabindex="-1"></a>            cdp.<span class="ex">connect</span>()</span>
-<span id="cb35-348"><a href="#cb35-348" aria-hidden="true" tabindex="-1"></a>            <span class="cf">try</span>:</span>
-<span id="cb35-349"><a href="#cb35-349" aria-hidden="true" tabindex="-1"></a>                cdp.send(<span class="st">&quot;Page.enable&quot;</span>)</span>
-<span id="cb35-350"><a href="#cb35-350" aria-hidden="true" tabindex="-1"></a>                cdp.send(<span class="st">&quot;Runtime.enable&quot;</span>)</span>
-<span id="cb35-351"><a href="#cb35-351" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-352"><a href="#cb35-352" aria-hidden="true" tabindex="-1"></a>                meta <span class="op">=</span> get_page_metadata(cdp)</span>
-<span id="cb35-353"><a href="#cb35-353" aria-hidden="true" tabindex="-1"></a>                title <span class="op">=</span> meta.get(<span class="st">&quot;title&quot;</span>, tab.get(<span class="st">&quot;title&quot;</span>, <span class="st">&quot;&quot;</span>))</span>
-<span id="cb35-354"><a href="#cb35-354" aria-hidden="true" tabindex="-1"></a>                url <span class="op">=</span> tab.get(<span class="st">&quot;url&quot;</span>, <span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-355"><a href="#cb35-355" aria-hidden="true" tabindex="-1"></a>                text_content <span class="op">=</span> get_page_content(cdp)</span>
-<span id="cb35-356"><a href="#cb35-356" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-357"><a href="#cb35-357" aria-hidden="true" tabindex="-1"></a>                lines <span class="op">=</span> []</span>
-<span id="cb35-358"><a href="#cb35-358" aria-hidden="true" tabindex="-1"></a>                lines.append(<span class="ss">f&quot;URL: </span><span class="sc">{</span>url<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb35-359"><a href="#cb35-359" aria-hidden="true" tabindex="-1"></a>                lines.append(<span class="ss">f&quot;标题: </span><span class="sc">{</span>title<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb35-360"><a href="#cb35-360" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> meta.get(<span class="st">&quot;description&quot;</span>):</span>
-<span id="cb35-361"><a href="#cb35-361" aria-hidden="true" tabindex="-1"></a>                    lines.append(<span class="ss">f&quot;描述: </span><span class="sc">{</span>meta[<span class="st">&#39;description&#39;</span>]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb35-362"><a href="#cb35-362" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> meta.get(<span class="st">&quot;author&quot;</span>):</span>
-<span id="cb35-363"><a href="#cb35-363" aria-hidden="true" tabindex="-1"></a>                    lines.append(<span class="ss">f&quot;作者: </span><span class="sc">{</span>meta[<span class="st">&#39;author&#39;</span>]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb35-364"><a href="#cb35-364" aria-hidden="true" tabindex="-1"></a>                <span class="cf">if</span> meta.get(<span class="st">&quot;language&quot;</span>):</span>
-<span id="cb35-365"><a href="#cb35-365" aria-hidden="true" tabindex="-1"></a>                    lines.append(<span class="ss">f&quot;语言: </span><span class="sc">{</span>meta[<span class="st">&#39;language&#39;</span>]<span class="sc">}</span><span class="ss">&quot;</span>)</span>
-<span id="cb35-366"><a href="#cb35-366" aria-hidden="true" tabindex="-1"></a>                lines.append(<span class="st">&quot;&quot;</span>)</span>
-<span id="cb35-367"><a href="#cb35-367" aria-hidden="true" tabindex="-1"></a>                lines.append(<span class="st">&quot;--- 页面正文 ---&quot;</span>)</span>
-<span id="cb35-368"><a href="#cb35-368" aria-hidden="true" tabindex="-1"></a>                lines.append(</span>
-<span id="cb35-369"><a href="#cb35-369" aria-hidden="true" tabindex="-1"></a>                    text_content <span class="cf">if</span> text_content <span class="cf">else</span> <span class="st">&quot;(无法提取页面内容)&quot;</span></span>
-<span id="cb35-370"><a href="#cb35-370" aria-hidden="true" tabindex="-1"></a>                )</span>
-<span id="cb35-371"><a href="#cb35-371" aria-hidden="true" tabindex="-1"></a>                <span class="cf">return</span> <span class="st">&quot;</span><span class="ch">\n</span><span class="st">&quot;</span>.join(lines)</span>
-<span id="cb35-372"><a href="#cb35-372" aria-hidden="true" tabindex="-1"></a>            <span class="cf">finally</span>:</span>
-<span id="cb35-373"><a href="#cb35-373" aria-hidden="true" tabindex="-1"></a>                cdp.close()</span>
-<span id="cb35-374"><a href="#cb35-374" aria-hidden="true" tabindex="-1"></a>        <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
-<span id="cb35-375"><a href="#cb35-375" aria-hidden="true" tabindex="-1"></a>            logger.error(<span class="st">&quot;get_web_content error: </span><span class="sc">%s</span><span class="st">&quot;</span>, e)</span>
-<span id="cb35-376"><a href="#cb35-376" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> <span class="ss">f&quot;错误: 获取页面内容失败 - </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">&quot;</span></span>
-<span id="cb35-377"><a href="#cb35-377" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-378"><a href="#cb35-378" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-379"><a href="#cb35-379" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-380"><a href="#cb35-380" aria-hidden="true" tabindex="-1"></a><span class="co"># Main</span></span>
-<span id="cb35-381"><a href="#cb35-381" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb35-382"><a href="#cb35-382" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> main():</span>
-<span id="cb35-383"><a href="#cb35-383" aria-hidden="true" tabindex="-1"></a>    logger.info(<span class="st">&quot;Checking CDP endpoint </span><span class="sc">%s</span><span class="st">:</span><span class="sc">%d</span><span class="st"> ...&quot;</span>, CDP_HOST, CDP_PORT)</span>
-<span id="cb35-384"><a href="#cb35-384" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> attempt <span class="kw">in</span> <span class="bu">range</span>(<span class="dv">5</span>):</span>
-<span id="cb35-385"><a href="#cb35-385" aria-hidden="true" tabindex="-1"></a>        tab <span class="op">=</span> get_active_tab()</span>
-<span id="cb35-386"><a href="#cb35-386" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> tab:</span>
-<span id="cb35-387"><a href="#cb35-387" aria-hidden="true" tabindex="-1"></a>            logger.info(<span class="st">&quot;CDP OK – found tab: </span><span class="sc">%s</span><span class="st">&quot;</span>, tab.get(<span class="st">&quot;title&quot;</span>, <span class="st">&quot;?&quot;</span>))</span>
-<span id="cb35-388"><a href="#cb35-388" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
-<span id="cb35-389"><a href="#cb35-389" aria-hidden="true" tabindex="-1"></a>        logger.info(<span class="st">&quot;Waiting for CDP... attempt </span><span class="sc">%d</span><span class="st">/5&quot;</span>, attempt <span class="op">+</span> <span class="dv">1</span>)</span>
-<span id="cb35-390"><a href="#cb35-390" aria-hidden="true" tabindex="-1"></a>        time.sleep(<span class="dv">2</span>)</span>
-<span id="cb35-391"><a href="#cb35-391" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
-<span id="cb35-392"><a href="#cb35-392" aria-hidden="true" tabindex="-1"></a>        logger.warning(</span>
-<span id="cb35-393"><a href="#cb35-393" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;No CDP tab found. &quot;</span></span>
-<span id="cb35-394"><a href="#cb35-394" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;Make sure Chromium is running with --remote-debugging-port=</span><span class="sc">%d</span><span class="st">&quot;</span>,</span>
-<span id="cb35-395"><a href="#cb35-395" aria-hidden="true" tabindex="-1"></a>            CDP_PORT,</span>
-<span id="cb35-396"><a href="#cb35-396" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb35-397"><a href="#cb35-397" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-398"><a href="#cb35-398" aria-hidden="true" tabindex="-1"></a>    <span class="im">import</span> socketserver</span>
-<span id="cb35-399"><a href="#cb35-399" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-400"><a href="#cb35-400" aria-hidden="true" tabindex="-1"></a>    <span class="kw">class</span> ReusableTCPServer(socketserver.TCPServer):</span>
-<span id="cb35-401"><a href="#cb35-401" aria-hidden="true" tabindex="-1"></a>        allow_reuse_address <span class="op">=</span> <span class="va">True</span></span>
-<span id="cb35-402"><a href="#cb35-402" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-403"><a href="#cb35-403" aria-hidden="true" tabindex="-1"></a>    server <span class="op">=</span> ReusableTCPServer((BRIDGE_HOST, BRIDGE_PORT), MCPHandler)</span>
-<span id="cb35-404"><a href="#cb35-404" aria-hidden="true" tabindex="-1"></a>    logger.info(</span>
-<span id="cb35-405"><a href="#cb35-405" aria-hidden="true" tabindex="-1"></a>        <span class="st">&quot;Chrome MCP Bridge listening on </span><span class="sc">%s</span><span class="st">:</span><span class="sc">%d</span><span class="st">&quot;</span>, BRIDGE_HOST, BRIDGE_PORT</span>
-<span id="cb35-406"><a href="#cb35-406" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb35-407"><a href="#cb35-407" aria-hidden="true" tabindex="-1"></a>    logger.info(<span class="st">&quot;CDP target: </span><span class="sc">%s</span><span class="st">:</span><span class="sc">%d</span><span class="st">&quot;</span>, CDP_HOST, CDP_PORT)</span>
-<span id="cb35-408"><a href="#cb35-408" aria-hidden="true" tabindex="-1"></a>    logger.info(<span class="st">&quot;Available tools: chrome_navigate, chrome_get_web_content&quot;</span>)</span>
-<span id="cb35-409"><a href="#cb35-409" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-410"><a href="#cb35-410" aria-hidden="true" tabindex="-1"></a>    <span class="cf">try</span>:</span>
-<span id="cb35-411"><a href="#cb35-411" aria-hidden="true" tabindex="-1"></a>        server.serve_forever()</span>
-<span id="cb35-412"><a href="#cb35-412" aria-hidden="true" tabindex="-1"></a>    <span class="cf">except</span> <span class="pp">KeyboardInterrupt</span>:</span>
-<span id="cb35-413"><a href="#cb35-413" aria-hidden="true" tabindex="-1"></a>        logger.info(<span class="st">&quot;Shutting down.&quot;</span>)</span>
-<span id="cb35-414"><a href="#cb35-414" aria-hidden="true" tabindex="-1"></a>        server.shutdown()</span>
-<span id="cb35-415"><a href="#cb35-415" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-416"><a href="#cb35-416" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb35-417"><a href="#cb35-417" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="va">__name__</span> <span class="op">==</span> <span class="st">&quot;__main__&quot;</span>:</span>
-<span id="cb35-418"><a href="#cb35-418" aria-hidden="true" tabindex="-1"></a>    main()</span></code></pre></div>
-<hr />
-<h2 id="更新日志">更新日志</h2>
-<table>
-<colgroup>
-<col style="width: 33%" />
-<col style="width: 33%" />
-<col style="width: 33%" />
-</colgroup>
-<thead>
-<tr>
-<th>日期</th>
-<th>版本</th>
-<th>变更</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>2026-07-16</td>
-<td>v2.0</td>
-<td>从简易 Python bridge 升级为 CDP 直连方案，新增
-<code>chrome_get_web_content</code></td>
-</tr>
-<tr>
-<td>2025-07-12</td>
-<td>v1.0</td>
-<td>初始版本，仅支持标题读取</td>
-</tr>
-</tbody>
-</table>
-<hr />
-<blockquote>
-<p>💡 <strong>提示</strong>：本教程可与 <a
-href="./STACKCHAN_TUTORIAL.md">StackChan MCP 部署教程</a>
-配合使用，构建完整的 AI 自动化体系——机器人操控 + 浏览器操控。</p>
-</blockquote>
-</body>
-</html>
+<nav aria-label="目录"><h2>目录</h2><ol>
+  <li><a href="#scope">功能与适用范围</a></li><li><a href="#prepare">下载项目、准备依赖</a></li>
+  <li><a href="#browser">启动专用浏览器</a></li><li><a href="#bridge">启动并验证 Bridge</a></li>
+  <li><a href="#client">连接 RikkaHub 与其他客户端</a></li><li><a href="#private">手机 / 私网接入</a></li>
+  <li><a href="#tools">三工具与批量图用法</a></li><li><a href="#budgets">等待、内容与图片预算</a></li>
+  <li><a href="#service">可选：用户服务</a></li><li><a href="#upgrade">升级、备份与回退</a></li>
+  <li><a href="#verify">测试与已验收范围</a></li><li><a href="#trouble">故障排查与安全反馈</a></li>
+</ol></nav>
+
+<section id="scope"><h2>1. 功能与适用范围</h2>
+<pre>MCP 客户端 → HTTP Bridge（默认 127.0.0.1:9224）
+           → 本机 CDP（127.0.0.1:9223）→ 专用 Chrome / Chromium</pre>
+<div class="table-wrap"><table><thead><tr><th>工具</th><th>能力</th></tr></thead><tbody>
+<tr><td><code>chrome_navigate</code></td><td>只打开一次指定 HTTP(S) URL，返回固定 <code>page_id</code>。小红书笔记 / 分享链接默认附带 <code>note_preview</code>。</td></tr>
+<tr><td><code>chrome_get_web_content</code></td><td>读取网页正文与元数据，优先传 <code>page_id</code> 准确定位。传 <code>url</code> 时先打开一次；两种参数互斥。</td></tr>
+<tr><td><code>chrome_view</code></td><td><code>list</code> 列图与有限笔记正文；<code>image</code> 单图；<code>images</code> 每次 1–12 图；<code>screenshot</code> 当前视口截图。</td></tr>
+</tbody></table></div>
+<p>模型要有视觉能力，客户端也必须将工具返回的每个 <code>ImageContent</code> 转成模型图片输入。图片链接、base64 文字、客户端缩略图都不等于模型真的获得了像素。</p>
+<p>小红书有专门的笔记主体选择器，避免把推荐区图片误当正文。普通网页可以提取文本、当前视口或可读的已加载图片；并非所有网站都有正文/评论的专用适配。网站 DOM 改版后可能需要更新。</p>
+<p>视频不在本版能力范围：视频笔记报告不支持，不播放、不下载、不从推荐封面补成“视频内容”。</p>
+</section>
+
+<section id="prepare"><h2>2. 下载项目、准备依赖</h2>
+<p>需要 Linux 图形桌面、已安装的 Chrome / Chromium、Python 3.10+。本教程不安装代理、不修改系统网络。Node.js 只用于离线测试中的 DOM 模拟，不是日常运行依赖。</p>
+<pre>git clone https://github.com/AZHi-xinxin/chrome-mcp-bridge.git
+cd chrome-mcp-bridge
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt</pre>
+<p>如果 <code>venv</code> 命令提示缺少组件，按当前 Linux 发行版安装 Python venv 包后重试。不使用系统级 <code>sudo pip</code>。</p>
+<p>运行源码是同目录下这三个文件，必须来自同一版本：</p>
+<ul><li><a href="chrome_mcp_bridge.py"><code>chrome_mcp_bridge.py</code></a>：HTTP / MCP 与导航。</li>
+<li><a href="chrome_vision.py"><code>chrome_vision.py</code></a>：快照、像素、批量预算。</li>
+<li><a href="chrome_note_dom.py"><code>chrome_note_dom.py</code></a>：只读 DOM 清单与笔记文本。</li></ul>
+<p>旧 HTML 内嵌的单文件程序已移除，避免复制到旧实现。通过 GitHub “Download ZIP” 下载也可以，但必须解压完整项目，不能只复制主脚本。</p>
+</section>
+
+<section id="browser"><h2>3. 启动专用浏览器</h2>
+<p>在登录图形桌面的终端启动，<code>chromium</code> 可按本机安装情况改成 <code>google-chrome</code>。使用独立的数据目录；不要关闭日常浏览器，不要删除其配置。</p>
+<pre>chromium \
+  --user-data-dir="$HOME/.local/share/chrome-mcp-profile" \
+  --remote-debugging-address=127.0.0.1 \
+  --remote-debugging-port=9223 \
+  --remote-allow-origins=http://127.0.0.1:9223 \
+  about:blank</pre>
+<p>Chrome 136 起调试参数需要与非默认数据目录配合使用；这也将调试会话与日常浏览器隔离。参见 <a href="https://developer.chrome.com/blog/remote-debugging-port">Chrome 官方说明</a>。不要用 <code>--no-sandbox</code>、全站安全禁用或 <code>--remote-allow-origins=*</code> 解决配置问题。</p>
+<p>需要登录某网站时由人类在这个专用浏览器正常操作。不要将 Cookies、账号密码或验证码复制给 AI，也不要导出整个日常浏览器资料。</p>
+<pre>curl --noproxy '*' -sS http://127.0.0.1:9223/json/version
+ss -ltn 'sport = :9223'</pre>
+<p>确认调试端口仅在回环监听。若看到 <code>0.0.0.0:9223</code> 或 <code>[::]:9223</code>，先关闭这个专用调试实例并纠正绑定，再继续。CDP 端口不要转发给手机。</p>
+</section>
+
+<section id="bridge"><h2>4. 启动并验证 Bridge</h2>
+<p>浏览器保留打开，在另一个终端进入仓库目录：</p>
+<pre>NO_PROXY=127.0.0.1,localhost .venv/bin/python chrome_mcp_bridge.py</pre>
+<p>默认监听 <code>127.0.0.1:9224</code>。日志写标准错误，不需要创建系统日志文件或以 root 运行。</p>
+<pre>curl --noproxy '*' -sS http://127.0.0.1:9224/ \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"local-check","version":"1"}}}'
+
+curl --noproxy '*' -sS http://127.0.0.1:9224/ \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'</pre>
+<p><code>initialize</code> 的 <code>serverInfo.version</code> 应为 <code>2.3.0</code>；<code>tools/list</code> 应有三个工具，且 <code>chrome_view</code> 有 <code>images</code> 模式。浏览器直接打开端点返回 <code>use POST</code> / HTTP 405 是预期现象。</p>
+<div class="table-wrap"><table><thead><tr><th>环境变量</th><th>默认</th><th>用途</th></tr></thead><tbody>
+<tr><td><code>CHROME_MCP_HOST</code></td><td><code>127.0.0.1</code></td><td>仅在配置好 ACL / 防火墙后，显式改成指定私网接口地址。</td></tr>
+<tr><td><code>CHROME_MCP_PORT</code></td><td><code>9224</code></td><td>Bridge HTTP 端口，1–65535。</td></tr>
+<tr><td><code>CHROME_CDP_PORT</code></td><td><code>9223</code></td><td>需与浏览器参数一致；CDP 主机固定为回环。</td></tr>
+</tbody></table></div>
+<p>修改后须重启 Bridge；端口冲突时先识别已有进程，不要随意终止其他服务。</p>
+</section>
+
+<section id="client"><h2>5. 连接 RikkaHub 与其他客户端</h2>
+<ol><li>在 MCP 设置中新增 HTTP 类型连接，名称可用 Chrome MCP。</li>
+<li>如果客户端与 Bridge 在同一电脑，地址填 <code>http://127.0.0.1:9224/</code>。</li>
+<li>保存、连接并刷新工具目录，确认三个工具与 <code>images</code> 参数。</li>
+<li>选择支持视觉的模型，再以用户提供且允许访问的图片页面测试。</li></ol>
+<p>本项目提供简单的 JSON-RPC HTTP 请求 / JSON 响应，不是 stdio 启动器，也不提供持续 SSE 事件流。客户端名称和设置随版本可能变化；如强制要求 SSE 或更完整的 HTTP MCP 会话能力，不保证直接兼容。</p>
+<p class="notice">手机上的 <code>127.0.0.1</code> 指手机，不是运行 Bridge 的电脑。远程连接必须先安排受限的私网访问；不能把地址随便换成公网 IP。</p>
+<p>模型只看到首图时，分别检查：MCP 回包的图片块数量、客户端是否保留每块、网关/模型请求是否携带每张图片。不要先假定网页没图，也不要为了排查而反复刷新网页。</p>
+</section>
+
+<section id="private"><h2>6. 手机 / 私网接入</h2>
+<p>推荐在电脑和手机之间使用由你管理的私网 / Tailscale，并限制只有指定设备可访问 MCP 端口。先配置 ACL 与主机防火墙，再扩大监听。Tailscale 自身配置参考 <a href="https://tailscale.com/kb/1017/install">官方安装文档</a>；不要把 Auth Key 放进公开教程、截图或仓库。</p>
+<p>用以下模板启动，先把占位符换成这台电脑的具体私网 IPv4 地址。<strong>占位符不能原样执行。</strong></p>
+<pre>CHROME_MCP_HOST='&lt;电脑的指定私网 IPv4&gt;' \
+NO_PROXY=127.0.0.1,localhost \
+  .venv/bin/python chrome_mcp_bridge.py</pre>
+<p>手机 MCP 地址改为 <code>http://&lt;该私网 IPv4&gt;:9224/</code>。CDP 地址仍保持 <code>127.0.0.1:9223</code>，不对手机开放。不要为了兼容多个地址直接改成全接口并开放所有来源。</p>
+<p>本项目没有应用层认证：获得端点访问权就能读取这个专用浏览器中允许读取的页面。私网也必须限制来源。若必须公开互联网访问，需另行设计认证、TLS、请求限制与审计；本教程不提供无认证公网部署方案。</p>
+<p>连接异常时检查客户端实际运行在哪里：手机本地、电脑本地和服务器端执行 MCP 的来源不同。只对真实请求来源开放，而不是机械地放通整个网段。</p>
+</section>
+
+<section id="tools"><h2>7. 工具与批量图片用法</h2>
+<h3>7.1 小红书：导航一次，再批量看图</h3>
+<p>下列是 MCP <code>tools/call</code> 的 <code>params</code> 示例；占位符必须来自用户链接或实际回执。</p>
+<pre>{"name":"chrome_navigate","arguments":{"url":"&lt;用户提供的笔记 URL&gt;"}}</pre>
+<p>回执包含 <code>navigation_status=opened</code>、<code>page_id</code>，以及通常的 <code>note_preview</code>。预览中的 <code>images</code> 有稳定 <code>image_id</code> 与有序 <code>index</code>，文本在 <code>note_content</code> 中。</p>
+<pre>{"name":"chrome_view","arguments":{
+  "mode":"images",
+  "page_id":"&lt;导航返回的 page_id&gt;",
+  "image_ids":["&lt;第 1 张 image_id&gt;","&lt;第 2 张 image_id&gt;"],
+  "wait_ms":6000
+}}</pre>
+<p>同样支持 1–12 张；按希望展示的顺序传 ID。回包先给总状态和逐图结果，再交替给每张标签与原生图片块。结果有 <code>requested_count</code>、<code>returned_count</code>、<code>complete / partial / unavailable</code>。不支持的图会标注失败原因，不静默替成其他图。</p>
+<p>拿到稳定 ID 就可直接请求，<code>partial</code> 不意味着必须重新 <code>list</code>。图像读取在预算内等待已知图的本地加载；不额外请求源图。若缺图、被拦、CORS 或页面变化，报告并停下，不重复导航或猜内容。</p>
+<h3>7.2 需要清单时才列图</h3>
+<pre>{"name":"chrome_view","arguments":{"mode":"list","page_id":"&lt;已有 page_id&gt;"}}</pre>
+<p>默认每页清单 20 项，<code>limit</code> 为 1–50。清单分页使用同一 <code>snapshot_id</code> 与 <code>offset</code>；这只翻已有清单，不滚动网页。按旧数字索引读取必须同时带 <code>snapshot_id</code>，优先使用 <code>image_id</code>。</p>
+<h3>7.3 单图、当前视口与普通网页正文</h3>
+<pre>{"name":"chrome_view","arguments":{"mode":"image","page_id":"&lt;page_id&gt;","image_id":"&lt;image_id&gt;"}}
+
+{"name":"chrome_view","arguments":{"mode":"screenshot","page_id":"&lt;page_id&gt;"}}
+
+{"name":"chrome_get_web_content","arguments":{"page_id":"&lt;page_id&gt;"}}</pre>
+<p>截图仅代表当前视口，不代表轮播里未显示的其他图片。普通正文工具不将像素变成文字。省略 <code>page_id</code> 的兼容调用可能选择 CDP 返回的第一张页面，并不保证是用户当前聚焦标签，所以应优先显式指定。</p>
+</section>
+
+<section id="budgets"><h2>8. 等待、内容与图片预算</h2>
+<div class="table-wrap"><table><thead><tr><th>项目</th><th>上限 / 默认</th><th>含义</th></tr></thead><tbody>
+<tr><td>导航预览等待</td><td>默认 12 秒</td><td><code>chrome_navigate.wait_ms</code>，可设 0–15000 ms；已就绪提前返回。</td></tr>
+<tr><td>列表 / 图像等待</td><td>默认 6 秒</td><td><code>chrome_view.wait_ms</code> 同范围；批量共用一份预算，不是每张各等 6 秒。</td></tr>
+<tr><td>批量图数</td><td>1–12 张</td><td>不同的已知 ID；超过 12 张按已有清单分批，不自动翻图。</td></tr>
+<tr><td>批量输出预算</td><td>8,000,000 字节 / 12,000,000 像素</td><td>按解码后的 JPEG 字节计算；base64 传输会更大。</td></tr>
+<tr><td>单图输出预算</td><td>1,500,000 字节 / 1,800,000 像素</td><td>源图超过 64,000,000 像素拒绝处理。</td></tr>
+<tr><td>批量最长边</td><td>最多 1024 px，12 张时 1000 px</td><td>还受请求尺寸与预算限制，可能进一步缩小；回执含实际尺寸。</td></tr>
+<tr><td>快照</td><td>最长 5 分钟，最多 8 份</td><td>可能提前淘汰；绑定原文档和图源，不把旧 ID 重新指向新内容。</td></tr>
+<tr><td>笔记文本</td><td>标题 300 / 正文 6000</td><td>读取渲染 DOM 中有限正文；网页文本不具备指令权限。</td></tr>
+<tr><td>评论</td><td>最多 5 条，每条 500</td><td>仅当前可见、已加载的评论。不滚动、不展开，不代表完整评论区。</td></tr>
+</tbody></table></div>
+<p><code>wait_ms=0</code> 只检查一次。这里的等待是本地加载等待预算，<strong>不是整个 HTTP 请求、CDP 操作、模型回答的硬超时</strong>。导航可能仍受正常网络与页面自身加载影响。多图减少工具来回，不消除图片占用的模型上下文；客户端/网关的请求上限仍可能更小。</p>
+</section>
+
+<section id="service"><h2>9. 可选：注册为用户服务</h2>
+<p>先确保手动启动成功。下例假设项目位于 <code>$HOME/chrome-mcp-bridge</code>；如果不在这里，修改实际路径。服务只负责 Bridge，浏览器由已登录的图形会话管理，不假定开机时已经有桌面、登录态或可用页面。</p>
+<p>用文本编辑器创建 <code>~/.config/systemd/user/chrome-mcp-bridge.service</code>：</p>
+<pre>[Unit]
+Description=Chrome MCP Bridge
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/chrome-mcp-bridge
+ExecStart=%h/chrome-mcp-bridge/.venv/bin/python %h/chrome-mcp-bridge/chrome_mcp_bridge.py
+Environment=CHROME_MCP_HOST=127.0.0.1
+Environment=CHROME_MCP_PORT=9224
+Environment=CHROME_CDP_PORT=9223
+Environment=NO_PROXY=127.0.0.1,localhost
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target</pre>
+<p>若必须使用受限私网接口，只修改 <code>CHROME_MCP_HOST</code> 到已配置 ACL / 防火墙的那个具体地址。不要复制历史部署的全接口绑定。</p>
+<pre>systemctl --user daemon-reload
+systemctl --user enable --now chrome-mcp-bridge.service
+systemctl --user status chrome-mcp-bridge.service --no-pager
+journalctl --user -u chrome-mcp-bridge.service -n 50 --no-pager</pre>
+<p>创建用户服务不需要 root。若此前已有同名系统服务，不要再同时启动第二份；先检查 <code>systemctl status chrome-mcp-bridge.service</code> 与端口占用，沿用并更新现有服务。</p>
+</section>
+
+<section id="upgrade"><h2>10. 升级、备份与回退</h2>
+<ol><li>结束当前工具调用。确认正在运行的服务和源码路径，保存服务配置与旧版本源码副本。</li>
+<li>如果仓库存在个人改动，先检查 <code>git status</code> 和差异，不覆盖它们；不要使用强制重置或清理命令。</li>
+<li>更新同一版本的三个运行模块与依赖。在备用目录运行测试，不要只替换主脚本。</li>
+<li>公开包默认改为回环，升级前确认客户端从哪里连接，保留明确的受限私网配置；不动浏览器登录态或代理。</li>
+<li>重启 Bridge 服务，核对版本、工具数量、绑定与端口，再在客户端刷新 MCP 目录。</li>
+<li>若验证失败，停止这次升级后的 Bridge，恢复明确备份的源码与服务配置，然后重启原 Bridge。不要删浏览器数据目录。</li></ol>
+<p>这次公开版本额外将 MCP 默认绑定收紧到 <code>127.0.0.1</code>、增加端口 / 绑定环境变量、日志改为 stderr，去掉不再调用的历史镜像函数；不含任何用户私有安装路径、服务器信息或凭据。这些公开包改动不会自动改动已有私人部署。</p>
+<p>本次只重启相关 Bridge，不要求重启电脑、手机、VPS 或浏览器。用户服务用 <code>systemctl --user restart chrome-mcp-bridge.service</code>；系统服务按实际名称管理，不混用。</p>
+</section>
+
+<section id="verify"><h2>11. 测试与已验收范围</h2>
+<pre>node --version
+.venv/bin/python -m unittest discover -p 'test_*.py' -v</pre>
+<p>2.3 功能基线有 101 项离线测试，公开包还附配置测试。测试使用合成 DOM 和假的 CDP，不读真实浏览器资料，也不访问小红书。缺少 Node 时部分测试会跳过，须检查 <code>skipped</code>，不能当作完整验收。</p>
+<p class="notice good"><strong>已验证的真实范围：</strong>当前 RikkaHub + 视觉模型的一次真实四图笔记测试，由客户端执行者回报：一次导航附清单，再一次 <code>images</code> 返回 4/4，逐张内容正确，没有漏图、重复或错序，总共两次工具调用。</p>
+<p>这不是对所有站点 / 版本 / 模型的兼容性保证。合成 12 图通过不等于真实 12 图通过。真实 12 图、下一轮是否继续携带视觉内容、其他客户端、完整评论区及视频未包含在本次真实验收内。</p>
+<p>自己验收时只使用一篇允许访问的普通图片页面：记录回包图数，请模型逐张描述，确认是否有重复或错序。界面显示多图不单独证明模型看到了所有图。不要为了压力测试反复刷新平台页面。</p>
+</section>
+
+<section id="trouble"><h2>12. 故障排查与安全反馈</h2>
+<div class="table-wrap"><table><thead><tr><th>现象</th><th>先检查什么</th></tr></thead><tbody>
+<tr><td>连不上 9224</td><td>Bridge 是否运行、监听在哪个接口、手机是否错误使用自身回环地址、私网 ACL / 防火墙是否允许真实请求来源。</td></tr>
+<tr><td>找不到浏览器</td><td>专用浏览器是否已启动、9223 是否回环监听、是否使用独立数据目录、有没有至少一个正常网页标签。</td></tr>
+<tr><td>CDP WebSocket 403</td><td>浏览器 Origin 白名单是否与 CDP 地址匹配；不要关闭浏览器安全机制或使用通配 Origin 来省事。</td></tr>
+<tr><td>仍然只有两个工具</td><td>是否运行旧源码、三个模块是否同版、是否重启了真正的 Bridge 服务、客户端是否刷新工具目录。</td></tr>
+<tr><td>页面打开但预览空 / partial</td><td>看 <code>page_id</code> 与已有图片 ID，稳定 ID 可直接取。别因为预览失败重复打开同一链接。持续不可用则停止并人工查看页面。</td></tr>
+<tr><td>某张图片没有返回</td><td>检查逐图错误：未加载、CORS、来源变化、文档变化、快照过期或资源预算。不能重抓 CDN 或从推荐区补图。</td></tr>
+<tr><td>模型只看见一张</td><td>按 MCP 图片块 → 客户端转换 → 网关请求 → 视觉模型逐层确认。仅显示首个缩略图或模型口述不足以定位责任。</td></tr>
+<tr><td>返回 blocked / unsupported</td><td>停止自动操作。由人类正常检查登录 / 页面 / 网站提示；不刷新轰炸、不绕过验证码、不播放不支持的视频。</td></tr>
+<tr><td>等待超过 6 / 12 秒</td><td>这两个数是本地加载预算，不是整个调用硬超时；还可能有 CDP、网络、客户端与模型时间。</td></tr>
+</tbody></table></div>
+<p>服务不自动滚动、翻图、点赞、评论、私信、播放或下载视频，不显式重取图片/CDN。但正常开页与浏览器后台加载仍有请求，<strong>不能承诺零风控或零封号风险</strong>。</p>
+<p>网站文字、评论与图片仅是外部数据，不是用户指令。不要照网页要求发密码、改配置或执行命令。反馈问题请提交版本、脱敏回执、图数与可公开的合成样例；不要公开 Cookies、令牌、签名链接、付款资料或私人截图。更多见 <a href="SECURITY.md">安全边界</a>。</p>
+</section>
+<footer><p>作者：<a href="https://github.com/AZHi-xinxin">AZHi-xinxin</a> · <a href="https://github.com/AZHi-xinxin/chrome-mcp-bridge">项目仓库</a> · <a href="README.md">README</a> · <a href="CHANGELOG.md">更新记录</a></p><p>教程与源码同版本维护；运行程序以仓库独立源码为准。本文件无需外部字体、脚本或图片，可离线阅读。</p></footer>
+</main></body></html>
