@@ -115,6 +115,14 @@ NO_PROXY=127.0.0.1,localhost \
 <p>手机 MCP 地址改为 <code>http://&lt;该私网 IPv4&gt;:9224/</code>。CDP 地址仍保持 <code>127.0.0.1:9223</code>，不对手机开放。不要为了兼容多个地址直接改成全接口并开放所有来源。</p>
 <p>本项目没有应用层认证：获得端点访问权就能读取这个专用浏览器中允许读取的页面。私网也必须限制来源。若必须公开互联网访问，需另行设计认证、TLS、请求限制与审计；本教程不提供无认证公网部署方案。</p>
 <p>连接异常时检查客户端实际运行在哪里：手机本地、电脑本地和服务器端执行 MCP 的来源不同。只对真实请求来源开放，而不是机械地放通整个网段。</p>
+<h3 id="home-away">6.1 家里与外出入口：升级一次，分别刷新</h3>
+<p>客户端名称可自行命名，例如 <code>ChromeMCP</code> 与 <code>ChromeOUTSIT</code>，名称不同不等于后台不同。如果两个入口只是同一台电脑、同一个 Bridge 的局域网 / Tailscale 访问路径，更新这个后端就会同时更新两个入口，无须再安装第二份或启动另一个同端口服务。若实际连接不同机器或实例，则要分别核查。</p>
+<ol><li><strong>确认后台。</strong>核对两项连接的地址对应哪台电脑、哪个服务；通过 <code>initialize</code> 看版本，当前图片版本为 <code>2.3.0</code>。版本相同不单独证明它们是同一实例，仍应核对实际部署。</li>
+<li><strong>分别刷新客户端。</strong>在 RikkaHub 中打开家里与外出两项 MCP 配置，分别重连 / 刷新目录。两边均应有 <code>chrome_navigate</code>、<code>chrome_get_web_content</code>、<code>chrome_view</code>，后者含 <code>mode="images"</code> 和 <code>image_ids</code>。只刷新一项，不会保证另一项的缓存同步。</li>
+<li><strong>保持运行条件。</strong>电脑需开机、联网且不休眠，专用 Chrome / Chromium 与 Bridge 都保持运行。手机本地调用时，两端 Tailscale 要在线且允许通信；若 MCP 在服务器端执行，应检查服务器的网络路径。</li>
+<li><strong>核对外出地址。</strong>使用 <code>http://&lt;电脑的 Tailscale IPv4&gt;:9224/</code>，不要照填占位符，也不要在外面使用家中 <code>192.168.x.x</code> 地址或手机自身回环地址。仅修改 URL 不会自动配置监听、ACL 或防火墙。</li>
+<li><strong>流量预检。</strong>出门前可关闭手机 Wi-Fi、保持 Tailscale 连接，用流量刷新工具目录，不必为查连通性打开小红书。目录正常后，如需看图验收，再使用一篇允许访问的笔记，并核对实际返回图数与模型所见内容。</li></ol>
+<p>新部署可以只使用一个受限且可达的 Tailscale 入口，在家和外出共用；不强制建立双入口。已保留双入口时，不要为“同步图片能力”开放公网、关闭安全限制、复制浏览器登录资料，或让两个入口重复打开同一链接。客户端目录显示正常也不等于模型一定收到全部图片，仍需按图片回传链路核对。</p>
 </section>
 
 <section id="tools"><h2>7. 工具与批量图片用法</h2>
@@ -194,6 +202,7 @@ journalctl --user -u chrome-mcp-bridge.service -n 50 --no-pager</pre>
 <li>若验证失败，停止这次升级后的 Bridge，恢复明确备份的源码与服务配置，然后重启原 Bridge。不要删浏览器数据目录。</li></ol>
 <p>这次公开版本额外将 MCP 默认绑定收紧到 <code>127.0.0.1</code>、增加端口 / 绑定环境变量、日志改为 stderr，去掉不再调用的历史镜像函数；不含任何用户私有安装路径、服务器信息或凭据。这些公开包改动不会自动改动已有私人部署。</p>
 <p>本次只重启相关 Bridge，不要求重启电脑、手机、VPS 或浏览器。用户服务用 <code>systemctl --user restart chrome-mcp-bridge.service</code>；系统服务按实际名称管理，不混用。</p>
+<p>同一后端的家里 / 外出两个入口只升级后端一次，但客户端里的两项配置都要分别刷新工具目录，见 <a href="#home-away">家里与外出入口</a>。如果后端已经返回新版及完整图片接口，不必重复安装或重启。</p>
 </section>
 
 <section id="verify"><h2>11. 测试与已验收范围</h2>
@@ -211,6 +220,8 @@ journalctl --user -u chrome-mcp-bridge.service -n 50 --no-pager</pre>
 <tr><td>找不到浏览器</td><td>专用浏览器是否已启动、9223 是否回环监听、是否使用独立数据目录、有没有至少一个正常网页标签。</td></tr>
 <tr><td>CDP WebSocket 403</td><td>浏览器 Origin 白名单是否与 CDP 地址匹配；不要关闭浏览器安全机制或使用通配 Origin 来省事。</td></tr>
 <tr><td>仍然只有两个工具</td><td>是否运行旧源码、三个模块是否同版、是否重启了真正的 Bridge 服务、客户端是否刷新工具目录。</td></tr>
+<tr><td>家里能看图，ChromeOUTSIT 仍没有图片工具</td><td>先确认两个地址是否指向同一后端，再单独刷新外出这项 MCP 的目录。不要因为显示名称不同就启动第二份服务。</td></tr>
+<tr><td>家里正常，出门连不上</td><td>检查电脑是否休眠、浏览器 / Bridge 是否仍运行、手机实际使用的 Tailnet 地址、Tailscale 在线状态及访问规则。先查目录连通性，不反复打开网站，不放宽到无认证公网。</td></tr>
 <tr><td>页面打开但预览空 / partial</td><td>看 <code>page_id</code> 与已有图片 ID，稳定 ID 可直接取。别因为预览失败重复打开同一链接。持续不可用则停止并人工查看页面。</td></tr>
 <tr><td>某张图片没有返回</td><td>检查逐图错误：未加载、CORS、来源变化、文档变化、快照过期或资源预算。不能重抓 CDN 或从推荐区补图。</td></tr>
 <tr><td>模型只看见一张</td><td>按 MCP 图片块 → 客户端转换 → 网关请求 → 视觉模型逐层确认。仅显示首个缩略图或模型口述不足以定位责任。</td></tr>
