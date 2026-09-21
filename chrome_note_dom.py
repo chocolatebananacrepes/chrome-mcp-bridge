@@ -22,6 +22,7 @@ INVENTORY_JS = r"""(() => {
   const result = (scope, state, expected) => ({
     document_id: documentId, title: state === 'blocked' ? '' : String(document.title || '').slice(0,300),
     scope, state, expected_total: expected, images, truncated,
+    viewport:{width:Number(globalThis.innerWidth || 0),height:Number(globalThis.innerHeight || 0)},
     ...(scope === 'note' ? {note_media:noteMedia, note_content:noteContent} : {})
   });
   const visible = el => {
@@ -43,7 +44,7 @@ INVENTORY_JS = r"""(() => {
       if (!visible(el)) continue;
       const text = String(el.innerText || el.textContent || '').slice(0,1800);
       const frame = String(el.tagName || '').toLowerCase() === 'iframe';
-      if (frame || /验证码|安全验证|滑块验证|拖动滑块|访问过于频繁|操作过于频繁|请登录后查看|登录后(?:继续|查看)/.test(text))
+      if (frame || /验证码|安全验证|滑块验证|拖动滑块|访问过于频繁|操作过于频繁|请登录后查看|登录后(?:继续|查看)|请求过于频繁|Too Many Requests|\b429\b/i.test(text))
         return true;
     }
     // A persistent "login" button is not an interception. Only a visible login

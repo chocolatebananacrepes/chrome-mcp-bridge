@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Chrome MCP Bridge - CDP-based MCP server for Chromium browser control.
-Version 2.3.0: navigation previews, bounded text, and native multi-image output.
+Version 2.4.1: deliver readable images independently from optional fill limits.
 
 Architecture:
   MCP Client -> HTTP :9224 (this bridge) -> CDP WebSocket :9223 -> Chromium
@@ -173,7 +173,8 @@ def get_page_metadata(cdp: CDPClient) -> dict:
 
 
 vision = ChromeVision(
-    cdp_factory=CDPClient, get_active_tab=get_active_tab, host=CDP_HOST, port=CDP_PORT
+    cdp_factory=CDPClient, get_active_tab=get_active_tab, host=CDP_HOST, port=CDP_PORT,
+    allow_image_loading=os.environ.get("CHROME_MCP_ALLOW_IMAGE_LOADING", "0") == "1"
 )
 
 
@@ -218,7 +219,7 @@ class MCPHandler(http.server.BaseHTTPRequestHandler):
                     "capabilities": {"tools": {}},
                     "serverInfo": {
                         "name": "ChromeMCP-CDP",
-                        "version": "2.3.0",
+                        "version": "2.4.1",
                     },
                 },
             })

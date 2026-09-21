@@ -21,6 +21,12 @@ class ConfigurationTests(unittest.TestCase):
         loaded = self.load_configuration({})
         self.assertEqual((loaded.BRIDGE_HOST, loaded.BRIDGE_PORT), ("127.0.0.1", 9224))
         self.assertEqual((loaded.CDP_HOST, loaded.CDP_PORT), ("127.0.0.1", 9223))
+        self.assertFalse(loaded.vision.allow_image_loading)
+
+    def test_native_loading_is_explicit_server_opt_in(self):
+        self.assertTrue(self.load_configuration({'CHROME_MCP_ALLOW_IMAGE_LOADING':'1'}).vision.allow_image_loading)
+        for value in ('0','true','yes',''):
+            self.assertFalse(self.load_configuration({'CHROME_MCP_ALLOW_IMAGE_LOADING':value}).vision.allow_image_loading)
 
     def test_private_bind_and_port_overrides(self):
         loaded = self.load_configuration({"CHROME_MCP_HOST": "192.0.2.10", "CHROME_MCP_PORT": "18000", "CHROME_CDP_PORT": "18001"})

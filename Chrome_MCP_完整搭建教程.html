@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Chrome MCP Bridge 2.3.0：Linux 搭建、原生多图、受限私网接入、安全边界与故障排查。">
-  <title>Chrome MCP Bridge 2.3.0 · 完整搭建教程</title>
+  <meta name="description" content="Chrome MCP Bridge 2.4.1：Linux 搭建、已有图片交付与可选补图分离、受限私网接入与安全边界。">
+  <title>Chrome MCP Bridge 2.4.1 · 完整搭建教程</title>
   <style>
     :root{color-scheme:light;--ink:#253345;--muted:#536477;--accent:#166b70;--line:#d7e2e8;--paper:#fff;--bg:#f3f7f8}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.8 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
@@ -19,10 +19,12 @@
 </head>
 <body><main>
 <header>
-  <div class="eyebrow">CHROME MCP BRIDGE · 2.3.0</div>
+  <div class="eyebrow">CHROME MCP BRIDGE · 2.4.1</div>
+  <p class="notice">本次 2.4.1 公开更新记录当前实现与有限验收：私有实例已部署并独立核验，手机两次单批回执分别为 8/8 和 5/11；不承诺稳定全图。Windows 和 Ubuntu 各通过 145 项离线功能测试，部署后版本、三个工具、源码校验值及合成页图片回包均已核验。本阶段停在这里，不继续追全图。<a href="NATIVE_LOADING.md">配置与验收回执</a> · <a href="LIMITS_AND_FUTURE.md">限制、经验与后续方向</a>。</p>
   <h1>让 AI 读网页，也真正看见图片</h1>
-  <p class="sub">完整搭建教程 · 2026-09-20 · Linux 桌面 / Chrome 或 Chromium / HTTP MCP</p>
-  <p>本版把旧的两工具教程升级成三个工具的可运行项目。小红书笔记默认在打开时附带图片清单、标题正文和当前可见评论；再调用一次批量看图，可返回多张独立原生图片。</p>
+  <p class="sub">完整搭建教程 · 2026-09-21 · Linux 桌面 / Chrome 或 Chromium / HTTP MCP</p>
+  <p>工具仍为三个，保留现有 <code>loading_policy</code> 参数。小红书笔记默认在打开时附带图片清单、标题正文和当前可见评论；已有 ID 时，再调用一次批量看图可返回多张独立原生图片。预览为空时可能仍需一次有界 list，不保证所有笔记都两次完成或返回全图。</p>
+  <p>日常保持默认 <code>passive</code>，每批最多 12 张，13 张按 12+1。显式 <code>native_lazy</code> 的四个候选和 30 秒冷却只限制额外补图；无需把正常读图拆成四张或安排计时重试。主动加载需服务器与调用方分别显式开启，可能新增浏览器请求。</p>
   <p class="notice"><strong>先看安全边界：</strong>这个个人工具没有应用层身份认证，公开包默认仅监听电脑回环地址。CDP 只能留在本机；MCP 不可直接开放公网。本教程不会配置绕过登录、验证码或平台访问控制。</p>
 </header>
 <nav aria-label="目录"><h2>目录</h2><ol>
@@ -87,7 +89,7 @@ ss -ltn 'sport = :9223'</pre>
 curl --noproxy '*' -sS http://127.0.0.1:9224/ \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'</pre>
-<p><code>initialize</code> 的 <code>serverInfo.version</code> 应为 <code>2.3.0</code>；<code>tools/list</code> 应有三个工具，且 <code>chrome_view</code> 有 <code>images</code> 模式。浏览器直接打开端点返回 <code>use POST</code> / HTTP 405 是预期现象。</p>
+<p>安装本版后，<code>initialize</code> 的 <code>serverInfo.version</code> 应为 <code>2.4.1</code>；<code>tools/list</code> 应有三个工具，且 <code>chrome_view</code> 保留 <code>images</code> 模式与 <code>loading_policy</code> 参数。源码或教程更新不证明正在运行的服务已更新，应核对自己的运行实例。浏览器直接打开端点返回 <code>use POST</code> / HTTP 405 是预期现象。</p>
 <div class="table-wrap"><table><thead><tr><th>环境变量</th><th>默认</th><th>用途</th></tr></thead><tbody>
 <tr><td><code>CHROME_MCP_HOST</code></td><td><code>127.0.0.1</code></td><td>仅在配置好 ACL / 防火墙后，显式改成指定私网接口地址。</td></tr>
 <tr><td><code>CHROME_MCP_PORT</code></td><td><code>9224</code></td><td>Bridge HTTP 端口，1–65535。</td></tr>
@@ -117,7 +119,7 @@ NO_PROXY=127.0.0.1,localhost \
 <p>连接异常时检查客户端实际运行在哪里：手机本地、电脑本地和服务器端执行 MCP 的来源不同。只对真实请求来源开放，而不是机械地放通整个网段。</p>
 <h3 id="home-away">6.1 家里与外出入口：升级一次，分别刷新</h3>
 <p>客户端名称可自行命名，例如 <code>ChromeMCP</code> 与 <code>ChromeOUTSIT</code>，名称不同不等于后台不同。如果两个入口只是同一台电脑、同一个 Bridge 的局域网 / Tailscale 访问路径，更新这个后端就会同时更新两个入口，无须再安装第二份或启动另一个同端口服务。若实际连接不同机器或实例，则要分别核查。</p>
-<ol><li><strong>确认后台。</strong>核对两项连接的地址对应哪台电脑、哪个服务；通过 <code>initialize</code> 看版本，当前图片版本为 <code>2.3.0</code>。版本相同不单独证明它们是同一实例，仍应核对实际部署。</li>
+<ol><li><strong>确认后台。</strong>核对两项连接的地址对应哪台电脑、哪个服务；通过 <code>initialize</code> 看版本，本次交付/补图分离修复需要实际运行 <code>2.4.1</code>。版本相同不单独证明它们是同一实例，仍应核对实际部署。</li>
 <li><strong>分别刷新客户端。</strong>在 RikkaHub 中打开家里与外出两项 MCP 配置，分别重连 / 刷新目录。两边均应有 <code>chrome_navigate</code>、<code>chrome_get_web_content</code>、<code>chrome_view</code>，后者含 <code>mode="images"</code> 和 <code>image_ids</code>。只刷新一项，不会保证另一项的缓存同步。</li>
 <li><strong>保持运行条件。</strong>电脑需开机、联网且不休眠，专用 Chrome / Chromium 与 Bridge 都保持运行。手机本地调用时，两端 Tailscale 要在线且允许通信；若 MCP 在服务器端执行，应检查服务器的网络路径。</li>
 <li><strong>核对外出地址。</strong>使用 <code>http://&lt;电脑的 Tailscale IPv4&gt;:9224/</code>，不要照填占位符，也不要在外面使用家中 <code>192.168.x.x</code> 地址或手机自身回环地址。仅修改 URL 不会自动配置监听、ACL 或防火墙。</li>
@@ -136,7 +138,7 @@ NO_PROXY=127.0.0.1,localhost \
   "image_ids":["&lt;第 1 张 image_id&gt;","&lt;第 2 张 image_id&gt;"],
   "wait_ms":6000
 }}</pre>
-<p>同样支持 1–12 张；按希望展示的顺序传 ID。回包先给总状态和逐图结果，再交替给每张标签与原生图片块。结果有 <code>requested_count</code>、<code>returned_count</code>、<code>complete / partial / unavailable</code>。不支持的图会标注失败原因，不静默替成其他图。</p>
+<p>同样支持 1–12 张；按希望展示的顺序传 ID。13 张按已有清单分成 12+1，与最多四个补图候选无关。回包先给总状态和逐图结果，再交替给每张标签与原生图片块。结果有 <code>requested_count</code>、<code>returned_count</code>、<code>complete / partial / unavailable</code>。不支持的图会标注失败原因，不静默替成其他图。</p>
 <p>拿到稳定 ID 就可直接请求，<code>partial</code> 不意味着必须重新 <code>list</code>。图像读取在预算内等待已知图的本地加载；不额外请求源图。若缺图、被拦、CORS 或页面变化，报告并停下，不重复导航或猜内容。</p>
 <h3>7.2 需要清单时才列图</h3>
 <pre>{"name":"chrome_view","arguments":{"mode":"list","page_id":"&lt;已有 page_id&gt;"}}</pre>
@@ -148,6 +150,28 @@ NO_PROXY=127.0.0.1,localhost \
 
 {"name":"chrome_get_web_content","arguments":{"page_id":"&lt;page_id&gt;"}}</pre>
 <p>截图仅代表当前视口，不代表轮播里未显示的其他图片。普通正文工具不将像素变成文字。省略 <code>page_id</code> 的兼容调用可能选择 CDP 返回的第一张页面，并不保证是用户当前聚焦标签，所以应优先显式指定。</p>
+<h3 id="delivery-fill">7.4 可选补图：先读取全批已有像素</h3>
+<p>默认 <code>passive</code> 保留原有逐图读取和共享等待时序。只有管理者确认专用浏览器 profile 并为 Bridge 配置 <code>CHROME_MCP_ALLOW_IMAGE_LOADING=1</code>，调用又显式选择 <code>loading_policy="native_lazy"</code> 时，才允许改变现有原生懒加载图片的 loading 提示。<code>partial</code> 本身不授予补图权限。</p>
+<pre>{"name":"chrome_view","arguments":{
+  "mode":"images",
+  "page_id":"&lt;已有 page_id&gt;",
+  "image_ids":["&lt;已有图 image_id&gt;","&lt;缺图 image_id&gt;"],
+  "loading_policy":"native_lazy",
+  "wait_ms":6000
+}}</pre>
+<p>显式模式允许同批选择最多 12 个已有 ID。先以零等待提取全批当前可读像素并保留输出预算，再只对 <code>not_loaded</code> 项做有界补图，最后在一次响应中按请求 ID 顺序输出。最多四个补图候选共用剩余等待预算；缺图多于四张时按可尝试候选分配等待时间，不给每张重新开始完整 <code>wait_ms</code>。补回的图若放不进余下输出预算，单独报告 <code>batch_output_limit</code>，不会挤掉已读图片。</p>
+<p>补图锁忙、同页 30 秒冷却或 256 项一次性来源账本满，只跳过额外补图。自然加载好的图片仍可读取；已有图片不因这些原因整批失败。登录/安全阻挡或文档变化仍会整批停止，丢弃本批已读像素；CORS、来源消失等单图错误逐项报告。服务器开关、主动页面/来源范围及所有原有资源上限继续生效。</p>
+<div class="table-wrap"><table><thead><tr><th>2.4.1 回执字段</th><th>含义</th></tr></thead><tbody>
+<tr><td><code>delivered</code></td><td>成功返回的全部 ID，按请求顺序；旧 <code>results</code> 继续保留。</td></tr>
+<tr><td><code>fetched_extra</code></td><td>本次 <code>eager_requested</code> 后成功返回的 ID，是 <code>delivered</code> 的子集。自然加载或 <code>already_loaded</code> 不计入。</td></tr>
+<tr><td><code>still_missing</code></td><td>未返回项的 <code>image_id</code>、<code>index</code>、<code>error</code>、<code>message</code>、<code>cooldown_remaining</code> 等逐图原因。</td></tr>
+<tr><td><code>cooldown_remaining</code></td><td>非负秒数，仅用于解释补图冷却；无需计时轮询，不安排后台重试。</td></tr>
+</tbody></table></div>
+<p><code>fetched_extra</code> 只描述提示后返回成功的顺序，不是网络请求数或主动提示的因果证明。<code>source_refetches=0</code> 不代表浏览器零请求，<code>browser_request_count=null</code> 仍表示未测量。该模式不改 src、不直接抓取 CDN、不翻图滚动、不修改 CORS，也不保证未加载图片一定能补回。详见 <a href="NATIVE_LOADING.md">加载边界与历史回执</a>。</p>
+<h3 id="t-regress-01">7.5 T-REGRESS-01：冷却中的 12 图请求</h3>
+<p>固定离线样例包含 12 个已知 ID，其中 11 张像素可读、1 张未加载，且同页仍处于补图冷却。一次 <code>native_lazy</code> 请求全部 12 个 ID，应返回 11 个独立图片块，<code>delivered</code> 含这 11 个 ID，<code>fetched_extra=[]</code>；只有缺失项进入 <code>still_missing</code> 并报告 <code>loading_cooldown</code> 及剩余秒数。不会发出 eager hint、等待 30 秒或定时重试。</p>
+<p>测试分别把缺图放在第 1、6、12 位；补图锁忙和 256 项账本满也验证相同的 11 图交付。这个回归证明本版源码不再因补图受限吞掉已有图片，不代表真实站点一定预载 11 张，也不代替手机验收。</p>
+<p>本版 11 图手机样本返回时 <code>cooldown_remaining</code> 约为 28 秒，这是本次补图留下的剩余值，不是进入调用时已经冷却的证据。因此不能把该样本写成手机 T-REGRESS-01 通过；上述入场冷却场景目前由离线回归支持。</p>
 </section>
 
 <section id="budgets"><h2>8. 等待、内容与图片预算</h2>
@@ -155,6 +179,8 @@ NO_PROXY=127.0.0.1,localhost \
 <tr><td>导航预览等待</td><td>默认 12 秒</td><td><code>chrome_navigate.wait_ms</code>，可设 0–15000 ms；已就绪提前返回。</td></tr>
 <tr><td>列表 / 图像等待</td><td>默认 6 秒</td><td><code>chrome_view.wait_ms</code> 同范围；批量共用一份预算，不是每张各等 6 秒。</td></tr>
 <tr><td>批量图数</td><td>1–12 张</td><td>不同的已知 ID；超过 12 张按已有清单分批，不自动翻图。</td></tr>
+<tr><td>显式补图候选</td><td>每次最多 4 个</td><td>与 12 张输出分开；先保留已有图片，余下可尝试候选共用剩余等待预算。</td></tr>
+<tr><td>补图冷却 / 账本</td><td>同页 30 秒 / 进程内 256 项</td><td>只跳过额外补图，不阻止已有像素交付；不安排自动定时重试。</td></tr>
 <tr><td>批量输出预算</td><td>8,000,000 字节 / 12,000,000 像素</td><td>按解码后的 JPEG 字节计算；base64 传输会更大。</td></tr>
 <tr><td>单图输出预算</td><td>1,500,000 字节 / 1,800,000 像素</td><td>源图超过 64,000,000 像素拒绝处理。</td></tr>
 <tr><td>批量最长边</td><td>最多 1024 px，12 张时 1000 px</td><td>还受请求尺寸与预算限制，可能进一步缩小；回执含实际尺寸。</td></tr>
@@ -194,6 +220,7 @@ journalctl --user -u chrome-mcp-bridge.service -n 50 --no-pager</pre>
 </section>
 
 <section id="upgrade"><h2>10. 升级、备份与回退</h2>
+<p class="notice">本次私有实例已完成 2.4.1 安装并独立核验：两个私网入口的版本、三个工具与新说明一致，运行模块校验值匹配，Bridge 服务正常且原浏览器进程未重启。备份目录仅确认存在，未读取内部或演练回滚。其他部署仍应按下列步骤核对自己的实例；本次公开更新的手机证据限于下文一次 8/8 和一次 5/11。</p>
 <ol><li>结束当前工具调用。确认正在运行的服务和源码路径，保存服务配置与旧版本源码副本。</li>
 <li>如果仓库存在个人改动，先检查 <code>git status</code> 和差异，不覆盖它们；不要使用强制重置或清理命令。</li>
 <li>更新同一版本的三个运行模块与依赖。在备用目录运行测试，不要只替换主脚本。</li>
@@ -208,9 +235,22 @@ journalctl --user -u chrome-mcp-bridge.service -n 50 --no-pager</pre>
 <section id="verify"><h2>11. 测试与已验收范围</h2>
 <pre>node --version
 .venv/bin/python -m unittest discover -p 'test_*.py' -v</pre>
-<p>2.3 功能基线有 101 项离线测试，公开包还附配置测试。测试使用合成 DOM 和假的 CDP，不读真实浏览器资料，也不访问小红书。缺少 Node 时部分测试会跳过，须检查 <code>skipped</code>，不能当作完整验收。</p>
-<p class="notice good"><strong>已验证的真实范围：</strong>当前 RikkaHub + 视觉模型的一次真实四图笔记测试，由客户端执行者回报：一次导航附清单，再一次 <code>images</code> 返回 4/4，逐张内容正确，没有漏图、重复或错序，总共两次工具调用。</p>
-<p>这不是对所有站点 / 版本 / 模型的兼容性保证。合成 12 图通过不等于真实 12 图通过。真实 12 图、下一轮是否继续携带视觉内容、其他客户端、完整评论区及视频未包含在本次真实验收内。</p>
+<p>2.4.1 在 Windows 和 Ubuntu 各通过 145 项离线功能测试。新增回归涵盖 T-REGRESS-01、补图锁忙/账本满、全批已有像素优先、补图预算与候选等待分配、单图失败与安全整批中止、固定 DOM 被动 4/6/8/11/13 图、13 图按 12+1，以及无自动定时重试。测试使用合成 DOM 和假的 CDP，不读真实浏览器资料，也不访问小红书。缺少 Node 时部分测试会跳过，须检查 <code>skipped</code>，不能当作完整验收。</p>
+<p>另有 Ubuntu 上私有部署安装器的 10 项纯测试与隔离 Chrome 153 合成检查通过，均无真实网站请求。该安装器不在公开仓库，10 项不计入仓库的 145 项。私有实例安装后，生产服务的合成 <code>about:blank</code> 页面中两张 data SVG 已返回原生图片及正确 metadata；自建页检查后已关闭。这验证了已部署服务的合成回包链路，不代表真实小红书全图或手机验收通过。</p>
+<h3>11.1 本版手机回执：有限样本，不承诺稳定全图</h3>
+<p>以下 P 编号表示笔记中的原始图片顺序，从 1 开始。两次均为一次 <code>images</code> 请求的结果，不是重试累计。</p>
+<div class="table-wrap"><table><thead><tr><th>样本</th><th>本次返回</th><th>补图结果</th></tr></thead><tbody>
+<tr><td>8 图笔记</td><td>P1–8，共 8/8</td><td>P5、P6、P7 在本次 <code>eager_requested</code> 后回传；仅说明先后顺序，不是网络计数或因果证明。</td></tr>
+<tr><td>11 图笔记</td><td>P1、P2、P3、P4、P11，共 5/11</td><td>P5–8 已尝试但仍 <code>not_loaded</code>；P9–10 因四个补图候选预算耗尽而未尝试。</td></tr>
+</tbody></table></div>
+<p>11 图回执的 <code>cooldown_remaining</code> 约为 28 秒，是返回时本次补图留下的冷却剩余值，不证明入场时已在冷却。手机 T-REGRESS-01 没有因此通过；真实 12/13 图、跨笔记稳定全图、后续轮次视觉保留未在本版验收。</p>
+<h3>11.2 本阶段停在这里</h3>
+<p>经验是将已有像素交付与额外补图资格分开，并如实区分“已返回”“提示后返回”“尝试仍缺失”和“预算不足未尝试”。8/8 样本不能抵消另一篇的 5/11。本次公开更新保留当前实现与两种结果，停止继续为凑齐全图扩大功能。</p>
+<p>自动翻图、外部取图、逆向签名均未实现，不应成为默认启用的补图兜底。后续路线仅是待评估方案，涉及额外动作、网络请求、维护成本与安全风险，不是本次已实现能力或承诺。详见 <a href="LIMITS_AND_FUTURE.md">当前限制、经验与后续方向</a>。</p>
+<h3>11.3 保留历史验收范围</h3>
+<p class="notice good"><strong>历史已验证的真实范围：</strong>RikkaHub + 视觉模型的一次真实四图笔记测试，由客户端执行者回报：一次导航附清单，再一次 <code>images</code> 返回 4/4，逐张内容正确，没有漏图、重复或错序，总共两次工具调用。这不是 2.4.1 的手机验收。</p>
+<p>2.4.0 历史手机回执仍保留：11 图笔记仅请求前四图并返回三图，均为 <code>already_loaded</code>，第 4 图 eager 后仍未加载，其余七图未请求；后续 8 图样本累计 5/8，其中一图在 eager 后成功回传，但四张分批与 30 秒冷却的体验未通过。详细限制见 <a href="NATIVE_LOADING.md">原始验收范围</a>。旧样本保留为经验记录，不能改写成本版手机成功证据。</p>
+<p>这些记录不是对所有站点 / 版本 / 模型的兼容性保证。合成 12/13 图通过不等于真实 12/13 图通过。真实 12/13 图、下一轮是否继续携带视觉内容、其他客户端、完整评论区及视频未包含在本次真实验收内。</p>
 <p>自己验收时只使用一篇允许访问的普通图片页面：记录回包图数，请模型逐张描述，确认是否有重复或错序。界面显示多图不单独证明模型看到了所有图。不要为了压力测试反复刷新平台页面。</p>
 </section>
 
@@ -224,11 +264,12 @@ journalctl --user -u chrome-mcp-bridge.service -n 50 --no-pager</pre>
 <tr><td>家里正常，出门连不上</td><td>检查电脑是否休眠、浏览器 / Bridge 是否仍运行、手机实际使用的 Tailnet 地址、Tailscale 在线状态及访问规则。先查目录连通性，不反复打开网站，不放宽到无认证公网。</td></tr>
 <tr><td>页面打开但预览空 / partial</td><td>看 <code>page_id</code> 与已有图片 ID，稳定 ID 可直接取。别因为预览失败重复打开同一链接。持续不可用则停止并人工查看页面。</td></tr>
 <tr><td>某张图片没有返回</td><td>检查逐图错误：未加载、CORS、来源变化、文档变化、快照过期或资源预算。不能重抓 CDN 或从推荐区补图。</td></tr>
+<tr><td>补图冷却、锁忙或账本满</td><td>2.4.1 应继续交付本批已有图片，仅在 <code>still_missing</code> 中说明缺图原因。核对运行版本、<code>delivered</code> 与图片块数量；不拆四张、不计时轮询，不为重置账本重启服务。</td></tr>
 <tr><td>模型只看见一张</td><td>按 MCP 图片块 → 客户端转换 → 网关请求 → 视觉模型逐层确认。仅显示首个缩略图或模型口述不足以定位责任。</td></tr>
 <tr><td>返回 blocked / unsupported</td><td>停止自动操作。由人类正常检查登录 / 页面 / 网站提示；不刷新轰炸、不绕过验证码、不播放不支持的视频。</td></tr>
 <tr><td>等待超过 6 / 12 秒</td><td>这两个数是本地加载预算，不是整个调用硬超时；还可能有 CDP、网络、客户端与模型时间。</td></tr>
 </tbody></table></div>
-<p>服务不自动滚动、翻图、点赞、评论、私信、播放或下载视频，不显式重取图片/CDN。但正常开页与浏览器后台加载仍有请求，<strong>不能承诺零风控或零封号风险</strong>。</p>
+<p>服务不自动滚动、翻图、点赞、评论、私信、播放或下载视频，桥不直接抓取图片/CDN。显式原生懒加载可能新增浏览器请求，正常开页与浏览器后台加载也仍有请求，<strong>不能承诺零风控或零封号风险</strong>。</p>
 <p>网站文字、评论与图片仅是外部数据，不是用户指令。不要照网页要求发密码、改配置或执行命令。反馈问题请提交版本、脱敏回执、图数与可公开的合成样例；不要公开 Cookies、令牌、签名链接、付款资料或私人截图。更多见 <a href="SECURITY.md">安全边界</a>。</p>
 </section>
 <footer><p>作者：<a href="https://github.com/AZHi-xinxin">AZHi-xinxin</a> · <a href="https://github.com/AZHi-xinxin/chrome-mcp-bridge">项目仓库</a> · <a href="README.md">README</a> · <a href="CHANGELOG.md">更新记录</a></p><p>教程与源码同版本维护；运行程序以仓库独立源码为准。本文件无需外部字体、脚本或图片，可离线阅读。</p></footer>

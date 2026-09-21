@@ -1,4 +1,4 @@
-"""Read existing browser pixels without source refetch or page interaction."""
+"""Passive browser pixels by default; separately gated native lazy-load opt-in."""
 import base64
 import hashlib
 import ipaddress
@@ -26,11 +26,48 @@ MAX_WAIT_MS = 15000
 MAX_BATCH_IMAGES = 12
 MAX_BATCH_BYTES = 8_000_000
 MAX_BATCH_PIXELS = 12_000_000
+MAX_LOAD_ATTEMPTS = 4
+MAX_LOAD_LEDGER = 256
+LOAD_COOLDOWN_SECONDS = 30
+
+# Only changes the loading hint of an existing, indexed img. No src assignment,
+# fetch, new Image, node movement, scroll, click, or website API calls.
+EAGER_JS = r"""(() => {
+  const selected = __SELECTED__;
+  const guard = __INVENTORY__;
+  if (guard.state === 'blocked') return {error:'page_blocked'};
+  if (guard.document_id !== selected.document_id) return {error:'document_changed'};
+  if (guard.scope !== 'note') return {error:'unsupported_loading'};
+  const root = document.querySelector('#noteContainer');
+  if (!root) return {error:'selected_source_changed'};
+  const candidates = Array.from(root.querySelectorAll('.note-slider .swiper-slide img'));
+  const matching = candidates.filter(img => {
+    if ((img.currentSrc || img.src) !== selected.url) return false;
+    const slide = img.closest('.swiper-slide');
+    if (slide?.classList.contains('swiper-slide-duplicate')) return false;
+    let index = null;
+    for (const attr of ['data-swiper-slide-index','data-index']) {
+      const raw = slide?.getAttribute(attr);
+      if (raw != null && /^\d+$/.test(String(raw)) && Number(raw)<256) { index=Number(raw); break; }
+    }
+    return 'note:'+index === selected.slot;
+  });
+  if (matching.length !== 1) return {error:'ambiguous_or_changed_source'};
+  const img = matching[0];
+  if (img.complete && img.naturalWidth && img.naturalHeight) return {status:'already_loaded'};
+  if (img.complete) return {error:'broken_image_no_retry'};
+  // Avoid activating responsive candidates different from the pinned URL.
+  if (img.src !== selected.url || img.srcset || img.closest('picture'))
+    return {error:'responsive_source_not_supported'};
+  if (img.loading !== 'lazy') return {error:'not_native_lazy'};
+  img.loading = 'eager';
+  return {status:'eager_requested'};
+})()"""
 
 TOOL_SCHEMA = {
     "name": "chrome_view",
     "description": (
-        "Read-only browser vision. Xiaohongshu navigate already returns a note preview; reuse its image_ids, "
+        "Browser vision, passive by default. Xiaohongshu navigate may return a note preview; reuse its image_ids, "
         "do not list again when the IDs you need are already known. list combines ordered note images with "
         "bounded title/body/currently visible comments, excluding recommendations. Use images with page_id + "
         "image_ids to return up to 12 separate native images per call (8MB decoded JPEG/12MP total limits); or image for one. "
@@ -38,10 +75,18 @@ TOOL_SCHEMA = {
         "within one shared wait_ms budget. Results label each returned/missing image; never infer unseen ones. "
         "IDs pin the same document "
         "and source for up to five minutes (eight-snapshot cache may evict earlier); unrelated recommendations do not invalidate them. "
-        "Only already-loaded pixels are read: no image/CDN refetch, scrolling, carousel clicks, "
+        "By default only already-loaded pixels are read: no image/CDN refetch, scrolling, carousel clicks, "
         "likes, comments or messages. If blocked/unavailable, STOP; do not reload or repeatedly retry. "
         "screenshot explicitly captures the current viewport, not hidden carousel images. "
-        "Normal page background traffic is not controlled by this tool."
+        "Normal page background traffic is not controlled by this tool. OPTIONAL loading_policy=native_lazy "
+        "requires server opt-in on a dedicated profile and explicit caller selection, only with images. "
+        "Read up to 12 IDs together; do not split into groups of four or wait/retry on a timer. "
+        "Existing readable images are delivered before optional filling. Loading cooldown, busy or quota "
+        "only skip fill, never discard readable images. Results include delivered, fetched_extra (a subset), "
+        "still_missing and cooldown_remaining. Expired IDs: list the same page without old snapshot/IDs, not reload. "
+        "It can initiate browser/CDN requests for at most 4 known missing native-lazy images, serially, "
+        "once per source per server process; it never guarantees all images or zero account risk. "
+        "Not a fallback to invoke automatically. Stop on login/challenge/rate limit; do not retry."
     ),
     "inputSchema": {"type": "object", "properties": {
         "mode": {"type": "string", "enum": ["screenshot", "list", "image", "images"], "default": "screenshot"},
@@ -57,8 +102,10 @@ TOOL_SCHEMA = {
                           "description": "Requested longest edge. Batch additionally caps at 1024px (1000px for 12 images) and total pixel/byte budgets; effective size is returned."},
         "wait_ms": {"type": "integer", "minimum": 0, "maximum": 15000, "default": 6000,
                     "description": "Local loading wait budget. 0 checks once; ready returns early. Shared across a batch, not per image. No source refetch or page refresh."},
+        "loading_policy": {"type":"string", "enum":["passive","native_lazy"], "default":"passive",
+                           "description":"Explicit opt-in only: native_lazy may cause additional browser requests by changing existing img.loading, only with images and server permission. Not scroll/flip/fetch; not a guarantee of success. wait_ms must be positive."},
     }, "additionalProperties": False},
-    "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": True},
+    "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True},
 }
 
 # Detached canvas; no appendChild, new Image, src assignment or fetching API.
@@ -152,10 +199,14 @@ def _jpeg_dimensions(data):
     raise VisionError("JPEG dimensions unavailable.","invalid_pixels")
 
 class ChromeVision:
-    def __init__(self,cdp_factory,get_active_tab,host="127.0.0.1",port=9223):
+    def __init__(self,cdp_factory,get_active_tab,host="127.0.0.1",port=9223,*,allow_image_loading=False):
         self.cdp_factory=cdp_factory; self.get_active_tab=get_active_tab
         self.endpoint=f"http://{host}:{port}"
         self.snapshots=OrderedDict(); self.lock=threading.Lock()
+        self.allow_image_loading=allow_image_loading is True
+        self.load_lock=threading.Lock()
+        self.load_attempts=set()
+        self.load_last={}
 
     def preview_opened_page(self, page_id, wait_ms=12000):
         """For an acknowledged navigation to a note/share URL, including initial blank DOM."""
@@ -169,6 +220,14 @@ class ChromeVision:
             if mode not in ("screenshot","list","image","images"): raise VisionError("Invalid mode.")
             dimension=_integer(args,"max_dimension",1280,128,1600)
             wait_ms=_integer(args,"wait_ms",int(WAIT_SECONDS*1000),0,MAX_WAIT_MS)
+            policy=args.get("loading_policy","passive")
+            if policy not in ("passive","native_lazy"):
+                raise VisionError("Invalid loading_policy.")
+            if policy=="native_lazy":
+                if mode!="images" or not wait_ms:
+                    raise VisionError("native_lazy requires images and positive wait_ms.")
+                if not self.allow_image_loading:
+                    raise VisionError("Server has not enabled image loading on a dedicated profile.","loading_disabled")
             if mode=="images":
                 ids=args.get("image_ids")
                 if (not args.get("page_id") or not isinstance(ids,list) or not 1<=len(ids)<=MAX_BATCH_IMAGES or
@@ -227,6 +286,7 @@ class ChromeVision:
 
     def _inventory(self,cdp,wait=False,wait_ms=None,expected_note=False):
         previous,stable=None,0
+        stop_reason="single_observation"
         budget=WAIT_SECONDS if wait_ms is None else wait_ms/1000
         max_polls=MAX_POLLS if wait_ms is None else max(1,int(budget/POLL_SECONDS)+1)
         started=time.monotonic()
@@ -247,13 +307,25 @@ class ChromeVision:
                 item["image_id"]=hashlib.sha256(json.dumps([data["document_id"],item["slot"],item["url"]],ensure_ascii=True).encode()).hexdigest()[:32]
             sig=(data.get("state"),data.get("expected_total"),[(i["image_id"],bool(i.get("loaded"))) for i in data["images"]])
             stable=stable+1 if sig==previous else 1; previous=sig
-            if not wait or data.get("scope")!="note" or data.get("state") in ("blocked","unsupported"): break
-            if data.get("state")=="ready" and stable>=3: break
-            if time.monotonic()>=deadline: break
+            if not wait: break
+            if data.get("scope")!="note" or data.get("state") in ("blocked","unsupported"):
+                stop_reason=data.get("state","unsupported"); break
+            if data.get("state")=="ready" and stable>=3:
+                stop_reason="ready_stable"; break
+            # Navigation needs stable IDs, not necessarily every decoded pixel.
+            # The following images call owns its own bounded pixel wait.
+            if (expected_note and stable>=3 and data["images"] and
+                len(data["images"])==data.get("expected_total") and
+                all(i.get("slot")=="note:"+str(n) for n,i in enumerate(data["images"]))):
+                stop_reason="inventory_stable_pixels_pending"; break
+            if time.monotonic()>=deadline:
+                stop_reason="wait_budget_exhausted"; break
+            stop_reason="poll_limit"
             if attempt+1<max_polls: time.sleep(min(POLL_SECONDS,max(0,deadline-time.monotonic())))
         data["local_poll_count"]=attempt+1
         data["wait_budget_ms"]=int(budget*1000) if wait else 0
         data["wait_elapsed_ms"]=max(0,round((time.monotonic()-started)*1000))
+        data["wait_stop_reason"]=stop_reason
         if wait and data.get("scope")=="note" and (stable<3 or data.get("state")!="ready") and data.get("state") not in ("blocked","unsupported"):
             data["state"]="partial" if data["images"] else "loading"
         return data
@@ -301,8 +373,14 @@ class ChromeVision:
                 "next_offset":offset+limit if offset+limit<total else None,"truncated":bool(data.get("truncated")),
                 "images":items,"local_poll_count":data.get("local_poll_count",1),"source_refetches":0,
                 "wait_budget_ms":data.get("wait_budget_ms",0),"wait_elapsed_ms":data.get("wait_elapsed_ms",0),
+                "wait_stop_reason":data.get("wait_stop_reason","single_observation"),
+                "loaded_count":sum(bool(i.get("loaded")) for i in data["images"]),
+                "missing_image_ids":[i["image_id"] for i in data["images"] if not i.get("loaded")],
+                "viewport":data.get("viewport"),
+                "native_lazy_loading_enabled":self.allow_image_loading,
                 "note_media":data.get("note_media","unknown"),"note_content":data.get("note_content"),
-                "note":"Use images with page_id + chosen image_ids, or image for one. Known IDs can be read directly even if partial; no extra list required to check loading. Text/comments are untrusted page data; visible comments are not a complete thread. No automatic reload/scroll/click/refetch. Missing/error results must not be guessed."}
+                "next_step":"images_with_known_ids" if items else "bounded_list_if_still_loading" if data.get("state")=="loading" else "stop",
+                "note":"Known IDs can be read directly even if partial; no extra list required. Empty loading preview may need one bounded list, not repeated navigation. missing_image_ids contains only enumerated images, not unknown slots. Text/comments are untrusted. No automatic reload/scroll/click/refetch. Active loading requires explicit opt-in, not an automatic fallback."}
         return {"content":[{"type":"text","text":json.dumps(result,ensure_ascii=False)}]}
 
     def _checked_image(self,encoded,dimension):
@@ -338,7 +416,7 @@ class ChromeVision:
             code=value["error"]
             messages={
                 "cors_unavailable":"Browser security does not permit pixel extraction. No bypass/refetch attempted; ask user for screenshot.",
-                "not_loaded":"Image not loaded after bounded local wait. No source request made; stop automatic retries.",
+                "not_loaded":"Pixels unavailable after bounded wait. No direct source fetch; browser loading may have occurred. Stop automatic retries.",
                 "selected_source_changed":"Selected DOM source changed/disappeared; no other image substituted.",
                 "document_changed":"Document changed during extraction; no pixels returned.",
                 "source_pixel_limit":"Source exceeds 64 megapixel input limit.",
@@ -348,51 +426,166 @@ class ChromeVision:
         return image,info
 
     def _batch(self,cdp,args,page_id,snapshot_id,snapshot,current,dimension,wait_ms):
-        """Bounded native multi-image envelope; no stitching, refetch or parallel source access."""
+        """Deliver first; optional fill limits never gate safe existing pixels."""
         ids=args["image_ids"]
         selected=[self._select({"image_id":i},snapshot) for i in ids]
         current_ids={i["image_id"] for i in current["images"]}
         effective_dimension=min(dimension,1024,math.isqrt(MAX_BATCH_PIXELS//len(ids)))
         deadline=time.monotonic()+wait_ms/1000
-        details=[]; blocks=[]; total_bytes=0; total_pixels=0
-        for item,index in selected:
-            row={"image_id":item["image_id"],"index":index}
+        active=args.get("loading_policy","passive")=="native_lazy"
+        load_count=0
+        if active:
+            document_url=snapshot["document_id"].split(":",1)[-1]
+            host=urllib.parse.urlsplit(document_url).hostname or ""
+            if snapshot.get("scope")!="note" or not (host=="xiaohongshu.com" or host.endswith(".xiaohongshu.com")):
+                raise VisionError("Explicit loading is limited to known Xiaohongshu note images.","unsupported_loading")
+        details=[{"image_id":item["image_id"],"index":index} for item,index in selected]
+        images={}; total_bytes=0; total_pixels=0
+
+        def guard(item=None):
+            state=self._inventory(cdp)
+            if state.get("state")=="blocked":
+                raise VisionError("Challenge visible; entire batch stopped.","page_blocked")
+            if state["document_id"]!=snapshot["document_id"]:
+                raise VisionError("Document changed; entire batch stopped.","document_changed")
+            if item is not None and (item["image_id"] not in current_ids or
+                not any(i["image_id"]==item["image_id"] for i in state["images"])):
+                raise VisionError("Selected source changed/disappeared; no substitution.","selected_source_changed")
+
+        def unavailable(row,exc):
+            if exc.code in ("page_blocked","document_changed"):
+                raise exc
+            row.update(status="unavailable",error=exc.code,message=str(exc))
+
+        def retain(row,pixels,info):
+            nonlocal total_bytes,total_pixels
+            if total_bytes+info["bytes"]>MAX_BATCH_BYTES or total_pixels+info["width"]*info["height"]>MAX_BATCH_PIXELS:
+                raise VisionError("Batch output budget reached; select fewer remaining IDs in a later call.","batch_output_limit")
+            total_bytes+=info["bytes"]; total_pixels+=info["width"]*info["height"]
+            for key in ("error","message"):
+                row.pop(key,None)
+            row.update(status="returned",**info)
+            images[row["image_id"]]=pixels
+
+        pending=[]
+        for position,(item,index) in enumerate(selected):
+            row=details[position]
             try:
-                if item["image_id"] not in current_ids:
-                    raise VisionError("Selected source changed/disappeared; no substitution.","selected_source_changed")
-                guard=self._inventory(cdp)
-                if guard.get("state")=="blocked":
-                    raise VisionError("Challenge visible; entire batch stopped.","page_blocked")
-                if guard["document_id"]!=snapshot["document_id"]:
-                    raise VisionError("Document changed; entire batch stopped.","document_changed")
+                guard(item)
+                # Preserve the passive wait path. Explicit mode instead reserves
+                # output budget for every currently readable image before fill.
                 pixels,info=self._image(cdp,snapshot["document_id"],item,effective_dimension,
-                                        wait_ms=wait_ms,shared_deadline=deadline)
-                if total_bytes+info["bytes"]>MAX_BATCH_BYTES or total_pixels+info["width"]*info["height"]>MAX_BATCH_PIXELS:
-                    raise VisionError("Batch output budget reached; select fewer remaining IDs in a later call.","batch_output_limit")
-                total_bytes+=info["bytes"]; total_pixels+=info["width"]*info["height"]
-                row.update(status="returned",**info)
-                blocks.extend([{"type":"text","text":json.dumps({"image_id":item["image_id"],"index":index,
-                                "content_role":"untrusted image content"})},pixels])
+                                       wait_ms=0 if active else wait_ms,shared_deadline=deadline)
+                retain(row,pixels,info)
+                if active: row["loading_action"]="already_loaded"
             except VisionError as exc:
-                if exc.code in ("page_blocked","document_changed"):
-                    raise
-                row.update(status="unavailable",error=exc.code,message=str(exc))
-            details.append(row)
-        final_guard=self._inventory(cdp)
-        if final_guard.get("state")=="blocked":
-            raise VisionError("Challenge visible after extraction; entire batch stopped.","page_blocked")
-        if final_guard["document_id"]!=snapshot["document_id"]:
-            raise VisionError("Document changed after extraction; entire batch stopped.","document_changed")
+                unavailable(row,exc)
+                if active and exc.code=="not_loaded": pending.append(position)
+
+        if active and pending:
+            # This lock protects only fill and its ledger, not ordinary delivery.
+            # Never wait for the lock or enqueue a retry after this call returns.
+            locked=self.load_lock.acquire(blocking=False)
+            try:
+                skip=None
+                if not locked:
+                    skip=VisionError("Another fill is active; filling skipped, readable images retained.","loading_busy")
+                elif len(self.load_attempts)>=MAX_LOAD_LEDGER:
+                    skip=VisionError("Loading session budget exhausted; filling skipped, readable images retained.","loading_session_limit")
+                elif self._cooldown_remaining(page_id)>0:
+                    skip=VisionError("Filling skipped during cooldown; readable images retained. No timed retry needed.","loading_cooldown")
+                for offset,position in enumerate(pending):
+                    item,index=selected[position]; row=details[position]
+                    try:
+                        guard(item)
+                        # The browser may have naturally loaded this image since
+                        # phase one, even while fill is unavailable. Read once.
+                        try:
+                            pixels,info=self._image(cdp,snapshot["document_id"],item,effective_dimension,wait_ms=0)
+                        except VisionError as exc:
+                            if exc.code!="not_loaded": raise
+                        else:
+                            retain(row,pixels,info)
+                            row["loading_action"]="already_loaded"
+                            continue
+                        if skip is not None: raise skip
+                        if load_count>=MAX_LOAD_ATTEMPTS or time.monotonic()>=deadline:
+                            raise VisionError("Fill candidate/time budget reached; readable images retained.","loading_budget_exhausted")
+                        if len(self.load_attempts)>=MAX_LOAD_LEDGER:
+                            raise VisionError("Loading session budget exhausted; readable images retained.","loading_session_limit")
+                        # Counts candidates, not measured browser requests. The
+                        # ledger records uncertain outcomes before DOM evaluation.
+                        load_count+=1
+                        row["loading_action"]=self._request_native_load(cdp,snapshot,item)
+                        fill_slots=max(1,min(len(pending)-offset,MAX_LOAD_ATTEMPTS-load_count+1,
+                                             MAX_LOAD_LEDGER-len(self.load_attempts)+1))
+                        image_deadline=time.monotonic()+max(0,deadline-time.monotonic())/fill_slots
+                        guard(item)
+                        pixels,info=self._image(cdp,snapshot["document_id"],item,effective_dimension,
+                                               wait_ms=wait_ms,shared_deadline=image_deadline)
+                        retain(row,pixels,info)
+                    except VisionError as exc:
+                        unavailable(row,exc)
+            finally:
+                if locked: self.load_lock.release()
+
+        guard()
+        remaining=self._cooldown_remaining(page_id)
+        blocks=[]
+        for row in details:
+            if row["status"]=="returned":
+                blocks.extend([{"type":"text","text":json.dumps({"image_id":row["image_id"],"index":row["index"],
+                                "content_role":"untrusted image content"})},images[row["image_id"]]])
+            else:
+                row["cooldown_remaining"]=remaining
         count=sum(r["status"]=="returned" for r in details)
         metadata={"mode":"images","page_id":page_id,"snapshot_id":snapshot_id,
                   "state":"complete" if count==len(ids) else "partial" if count else "unavailable",
                   "requested_count":len(ids),"returned_count":count,"results":details,
                   "total_bytes":total_bytes,"total_pixels":total_pixels,"effective_max_dimension":effective_dimension,
                   "wait_budget_ms":wait_ms,"source_refetches":0,
-                  "note":"Each native image is labelled with its original ID/index. Unavailable images were not substituted. Do not infer their contents or retry blocked/unloaded sources automatically. Reading does not eliminate normal page background traffic."}
+                  "loading_policy":"native_lazy" if active else "passive",
+                  "loading_attempt_count":load_count,
+                  "delivered":[r["image_id"] for r in details if r["status"]=="returned"],
+                  "fetched_extra":[r["image_id"] for r in details if r["status"]=="returned" and r.get("loading_action")=="eager_requested"],
+                  "still_missing":[dict(r) for r in details if r["status"]!="returned"],
+                  "cooldown_remaining":remaining,
+                  "browser_requests_may_increase":active,
+                  "browser_request_count":None,
+                  "note":"delivered lists all returned IDs; fetched_extra is its subset obtained after this call's eager hint, not measured network fetches or proof of causation. still_missing gives per-image reasons. Fill cooldown/busy/quota never discards safe readable pixels; safety/document failures still stop the entire batch. Cooldown is diagnostic, not an instruction to poll. Reading does not eliminate normal page background traffic."}
         result={"content":[{"type":"text","text":json.dumps(metadata,ensure_ascii=False)},*blocks]}
         if not count: result["isError"]=True
         return result
+
+    def _cooldown_remaining(self,page_id):
+        last=self.load_last.get(page_id)
+        return 0.0 if last is None else math.ceil(max(0.0,LOAD_COOLDOWN_SECONDS-(time.monotonic()-last))*1000)/1000
+
+    def _request_native_load(self,cdp,snapshot,item):
+        """Under load_lock. Remember attempts before evaluation: uncertain != retryable."""
+        if not item["slot"].startswith("note:") or not item["slot"][5:].isdigit():
+            raise VisionError("Unknown logical slide index; no loading attempted.","unknown_slide_order")
+        parsed=urllib.parse.urlsplit(item["url"]); host=parsed.hostname or ""
+        if (parsed.scheme!="https" or parsed.username or parsed.password or
+            parsed.port not in (None,443) or not (host=="xhscdn.com" or host.endswith(".xhscdn.com"))):
+            raise VisionError("Loading only permits an existing HTTPS Xiaohongshu image CDN source.","unsupported_loading_source")
+        key=(snapshot["document_id"],item["slot"],item["url"])
+        if key in self.load_attempts:
+            raise VisionError("This source already had its one loading attempt; no retry.","loading_already_attempted")
+        if len(self.load_attempts)>=MAX_LOAD_LEDGER:
+            raise VisionError("Loading session budget exhausted.","loading_session_limit")
+        self.load_attempts.add(key)
+        self.load_last[snapshot["page_id"]]=time.monotonic()
+        pinned={"document_id":snapshot["document_id"],"url":item["url"],"slot":item["slot"]}
+        script=EAGER_JS.replace("__INVENTORY__",INVENTORY_JS).replace("__SELECTED__",json.dumps(pinned))
+        value=_value(cdp.evaluate(script))
+        if not isinstance(value,dict):
+            raise VisionError("Loading outcome unknown; do not retry.","loading_outcome_unknown")
+        if value.get("error"):
+            raise VisionError("Native lazy loading not performed: "+value["error"],value["error"])
+        if value.get("status") not in ("eager_requested","already_loaded"):
+            raise VisionError("Loading outcome unknown; do not retry.","loading_outcome_unknown")
+        return value["status"]
 
     def _capture(self,cdp,dimension):
         # Explicit screenshot only; not an automatic image failure fallback.

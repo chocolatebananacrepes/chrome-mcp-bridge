@@ -122,7 +122,9 @@ class ChromeVisionTests(unittest.TestCase):
         return [s for m, s in self.source.calls if m == "Runtime.evaluate" and s != vision.INVENTORY_JS]
 
     def test_schema_read_only_rejects_external_url(self):
-        self.assertTrue(vision.TOOL_SCHEMA["annotations"]["readOnlyHint"])
+        # Default remains passive, but explicit native_lazy can change img.loading.
+        self.assertFalse(vision.TOOL_SCHEMA["annotations"]["readOnlyHint"])
+        self.assertEqual(vision.TOOL_SCHEMA['inputSchema']['properties']['loading_policy']['default'],'passive')
         self.assertFalse(vision.TOOL_SCHEMA["annotations"]["destructiveHint"])
         self.assertFalse(vision.TOOL_SCHEMA["inputSchema"]["additionalProperties"])
         self.assertNotIn("url", vision.TOOL_SCHEMA["inputSchema"]["properties"])
