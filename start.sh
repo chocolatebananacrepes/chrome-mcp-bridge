@@ -20,8 +20,8 @@ for i in $(seq 1 30); do
 done
 
 export CHROME_MCP_HOST=0.0.0.0
-export CHROME_MCP_PORT=9224
+export CHROME_MCP_PORT=8080
 export CHROME_CDP_PORT=9223
 
-echo "[start] Starting Chrome MCP Bridge on 0.0.0.0:9224 ..."
+echo "[start] Starting Chrome MCP Bridge on 0.0.0.0:8080 ..."
 exec python chrome_mcp_bridge.py
